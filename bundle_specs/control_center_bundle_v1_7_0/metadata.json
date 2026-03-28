@@ -1,9 +1,0 @@
-{
-  "id": "control-center",
-  "name": "Control Center",
-  "version": "1.7.0",
-  "port": 8444,
-  "open_path": "/",
-  "health_url": "http://127.0.0.1:9000/api/health",
-  "local_upstream": "http://127.0.0.1:9000"
-}
