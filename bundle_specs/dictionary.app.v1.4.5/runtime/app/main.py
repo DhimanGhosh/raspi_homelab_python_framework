@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 import nltk
 from nltk.corpus import wordnet as wn
 
-app = FastAPI(title="Offline Dictionary", version="1.4.2")
+app = FastAPI(title="Offline Dictionary", version="1.4.5")
 app.mount('/static', StaticFiles(directory='/opt/offline-dictionary/static'), name='static')
 
 @app.on_event('startup')
@@ -43,7 +43,7 @@ def favicon():
 
 @app.get('/api/health')
 def health():
-    return {'ok': True, 'service': 'Offline Dictionary', 'version': '1.4.2'}
+    return {'ok': True, 'service': 'Offline Dictionary', 'version': '1.4.5'}
 
 @app.get('/api/lookup')
 def lookup(q: str = Query(..., min_length=1)):
