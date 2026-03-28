@@ -28,7 +28,7 @@ def discover_bundles():
 
 @app.get("/")
 def index():
-    return render_template("index.html", fqdn=settings.tailscale_fqdn, public_cc_port=settings.control_center_public_port, installed=load_installed_apps(settings.apps_dir), bundles=discover_bundles(), health=health_snapshot(settings), expected_docker_root=str(settings.docker_root_dir))
+    return render_template("index.html", fqdn=settings.tailscale_fqdn, public_cc_port=settings.control_center_public_port, installed=load_installed_apps(settings.apps_dir, settings), bundles=discover_bundles(), health=health_snapshot(settings), expected_docker_root=str(settings.docker_root_dir))
 
 @app.get("/api/health")
 def health():
@@ -36,11 +36,11 @@ def health():
 
 @app.get("/api/bundles")
 def bundles():
-    return jsonify({"bundles": discover_bundles(), "installed": load_installed_apps(settings.apps_dir)})
+    return jsonify({"bundles": discover_bundles(), "installed": load_installed_apps(settings.apps_dir, settings)})
 
 @app.get("/api/logs/<app_id>")
 def app_logs(app_id: str):
-    installed = {item["id"]: item for item in load_installed_apps(settings.apps_dir)}
+    installed = {item["id"]: item for item in load_installed_apps(settings.apps_dir, settings)}
     app_meta = installed.get(app_id)
     if not app_meta or not app_meta.get("log_path"):
         return jsonify({"ok": False, "message": f"No log found for {app_id}"}), 404

@@ -82,7 +82,16 @@ def record_install_state(apps_dir: Path, app_id: str, meta: dict, extracted: Pat
     shutil.copytree(extracted, bundle_copy)
 
 
-def load_installed_apps(apps_dir: Path) -> list[dict]:
+def _is_stale_install(settings, app_id: str, state: dict) -> bool:
+    runtime_value = state.get("runtime_dir")
+    runtime_dir = Path(runtime_value) if runtime_value else (settings.runtime_dir / app_id)
+    snippet = settings.caddy_apps_dir / f"{app_id}.caddy"
+    # If the app was marked installed but its runtime and proxy snippet are both gone,
+    # treat it as stale and hide it from the Control Center.
+    return state.get("status") == "installed" and (not runtime_dir.exists()) and (not snippet.exists())
+
+
+def load_installed_apps(apps_dir: Path, settings=None) -> list[dict]:
     out = []
     if not apps_dir.exists():
         return out
@@ -91,6 +100,8 @@ def load_installed_apps(apps_dir: Path) -> list[dict]:
         if not meta:
             continue
         state = read_json(p / "install_state.json", default={}) or {}
+        if settings is not None and _is_stale_install(settings, meta.get("id", p.name), state):
+            continue
         combined = dict(meta)
         combined["install_status"] = state.get("status", "unknown")
         combined["last_error"] = state.get("last_error")
