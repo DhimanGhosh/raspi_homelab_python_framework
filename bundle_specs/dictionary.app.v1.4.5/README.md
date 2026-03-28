@@ -1,2 +1,2 @@
-# Dictionary 1.4.2
-Adds an in-app version badge while keeping the stable 1.4.1 behavior.
+# Dictionary 1.4.5
+Adds an in-app version badge in the header section
