@@ -1,9 +1,0 @@
-{
-  "id": "dictionary",
-  "name": "Dictionary",
-  "version": "1.4.2",
-  "port": 8455,
-  "open_path": "/",
-  "health_url": "http://127.0.0.1:8133/api/health",
-  "local_upstream": "http://127.0.0.1:8133"
-}
