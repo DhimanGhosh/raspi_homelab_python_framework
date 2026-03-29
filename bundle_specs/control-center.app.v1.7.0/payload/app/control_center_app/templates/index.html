@@ -1,1 +1,100 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Control Center</title><link rel="stylesheet" href="/static/app.css"></head><body><div class="wrap"><header><h1>Raspi Homelab Control Center</h1><p>{{ fqdn }} : {{ public_cc_port }}</p><button id="refreshBtn">Refresh</button></header><section class="card"><h2>Installed Apps</h2><div id="installed"></div></section><section class="card"><h2>Available Bundles</h2><div id="bundles"></div></section><section class="card"><h2>Upload Bundle</h2><form id="uploadForm"><input type="file" name="file" required><button type="submit">Upload</button></form></section><section class="card"><h2>Logs</h2><pre id="logs">No log loaded.</pre></section></div><script src="/static/app.js"></script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pi Control Center</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <header class="hero">
+    <div>
+      <h1>Pi Control Center</h1>
+      <div class="muted">Control OS for your Pi-NAS</div>
+      {% if sdcard_warning %}<div class="warn-banner">{{ sdcard_warning }}</div>{% endif %}
+    </div>
+    <div class="hero-actions">
+      <div class="badge version-badge">v{{ current_version }}</div>
+      <button id="appsRescanBtn" class="secondary icon-btn" title="Rescan Apps">⟳ <span>Apps</span></button>
+      <button id="menuToggle" class="secondary icon-btn" aria-label="Open menu">☰</button>
+    </div>
+  </header>
+
+  <section class="card storage">
+    <h2>Storage</h2>
+    <div class="grid3">
+      <div class="metric"><span>NAS Usage</span><strong>{{ nas_usage.used_gb }} GB / {{ nas_usage.total_gb }} GB</strong></div>
+      <div class="metric"><span>Homelab Usage</span><strong>{{ homelab_usage.used_gb }} GB / {{ homelab_usage.total_gb }} GB</strong></div>
+      <div class="metric"><span>Pi SD Card Storage</span><strong>{{ root_usage.used_gb }} GB / {{ root_usage.total_gb }} GB</strong><small class="muted">Docker root: {{ docker_root }}</small></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row between"><h2>Homelab Backup & Rollback</h2><button id="createBackupBtn">Create Backup</button></div>
+    <div class="muted">Creates a one-click snapshot of the homelab stack under /mnt/nas/homelab plus Control Center/Caddy service files for rollback.</div>
+    <div class="muted small">Backup store: <span id="backupRoot">{{ backup_root }}</span></div>
+    <div id="backupsArea" class="backup-list"></div>
+  </section>
+
+  <section class="card bundle-upload-card">
+    <h2>Bundle Upload</h2>
+    <form id="uploadForm" enctype="multipart/form-data" class="bundle-upload">
+      <label id="dropZone" class="drop-zone">
+        <input id="bundleInput" type="file" name="files" multiple required>
+        <div><strong>Drop .tgz / .tar.gz / .zip bundles here</strong><div class="muted small">or click to browse</div></div>
+      </label>
+      <button type="submit">Upload Bundle(s)</button>
+    </form>
+    <div id="uploadMsg" class="muted"></div>
+  </section>
+
+  <section class="card">
+    <div class="row between"><h2>Install Queue</h2><div class="queue-tools"><span class="muted">Live app install manager</span><button id="clearCompletedBtn" class="secondary">Clear completed</button><button id="clearAllBtn" class="secondary danger-soft">Clear all</button></div></div>
+    <div id="queueMsg" class="muted queue-msg"></div>
+    <div id="jobsArea" class="job-grid"></div>
+  </section>
+
+  <section class="card" id="logCard" style="display:none">
+    <div class="row between"><h2>Selected Job Log</h2><button id="hideLogBtn" class="secondary">Hide</button></div>
+    <pre id="logBox" class="log-box"></pre>
+  </section>
+
+  <section class="card">
+    <div class="row between"><h2>Apps, Installed Bundles & Marketplace</h2><div class="muted">Uploaded bundles: <span id="bundleCount">{{ total_bundles }}</span></div></div>
+    <div id="appsArea" class="cards"></div>
+  </section>
+</div>
+
+<div id="menuDrawer" class="notification-drawer hidden">
+  <div class="drawer-header row between">
+    <div><h2>Menu</h2><div class="muted small">Quick actions</div></div>
+  </div>
+  <div class="menu-list">
+    <button id="menuNotificationsBtn">Notifications <span id="topNotificationCount" class="notif-badge inline">0</span></button>
+    <button id="installAllBtn">Install All</button>
+    <button id="updateAllBtn">Update All</button>
+    <button id="menuRescanBtn" class="secondary">Rescan Marketplace</button>
+  </div>
+</div>
+
+<div id="notificationDrawer" class="notification-drawer hidden">
+  <div class="drawer-header row between">
+    <div>
+      <h2 id="notificationTitle">Notifications</h2>
+      <div id="notificationSubtitle" class="muted small"></div>
+    </div>
+    <div class="bundle-actions">
+      <button id="clearNotificationsBtn" class="secondary">Clear all</button>
+    </div>
+  </div>
+  <div id="notificationsArea"></div>
+</div>
+<div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
+
+<script>
+window.__INITIAL_STATE__ = {{ {'apps': apps, 'notifications': notifications, 'jobs': jobs, 'current_version': current_version, 'total_bundles': total_bundles, 'ota': ota, 'backups': backups, 'notification_total': notification_total, 'backup_root': backup_root, 'docker_root': docker_root, 'sdcard_warning': sdcard_warning}|tojson }};
+</script>
+<script src="/static/app.js"></script>
+</body>
+</html>
