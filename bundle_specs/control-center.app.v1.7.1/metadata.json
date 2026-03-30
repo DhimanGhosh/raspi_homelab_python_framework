@@ -1,7 +1,7 @@
 {
   "id": "control-center",
   "name": "Control Center",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "type": "python",
   "entrypoint": "bundle.py",
   "health_url": "http://127.0.0.1:9000/api/health",

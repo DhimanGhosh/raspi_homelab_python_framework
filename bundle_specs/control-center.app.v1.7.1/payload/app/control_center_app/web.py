@@ -14,7 +14,7 @@ BACKUPS_DIR = Path(os.getenv("HOMELAB_BACKUPS_DIR", str(NAS_DIR / "homelab" / "b
 ENV_FILE = Path(os.environ.get("HOMELAB_ENV_FILE", ".env")).resolve()
 REPO_ROOT = Path(os.environ.get("REPO_ROOT", ENV_FILE.parent)).resolve()
 HOMELABCTL_BIN = Path(os.environ.get("HOMELABCTL_BIN", REPO_ROOT / ".venv" / "bin" / "homelabctl"))
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 
 for p in [DATA_DIR, LOG_DIR, INSTALLERS_DIR, APPS_DIR, BACKUPS_DIR]:
     p.mkdir(parents=True, exist_ok=True)
@@ -33,6 +33,7 @@ KNOWN_APPS = {
     "dictionary": {"name": "Dictionary", "port": 8455, "open_path": "/"},
     "api-gateway": {"name": "API Gateway", "port": 8456, "open_path": "/docs"},
     "control-center": {"name": "Control Center", "port": 8444, "open_path": "/"},
+    "music-player": {"name": "Music Player", "port": 8459, "open_path": "/"},
 }
 APP_ID_ALIASES = {
     "home_assistant": "home-assistant",
@@ -244,6 +245,12 @@ def scan_apps():
         m.update(KNOWN_APPS.get(app_id, {}))
         m.update(installed.get(app_id, {}))
         latest = latest_by_id.get(app_id)
+        if latest and (not m.get("name") or not m.get("port") or not m.get("open_path")):
+            latest_meta = read_bundle_metadata((INSTALLERS_DIR / latest["filename"])) if (INSTALLERS_DIR / latest["filename"]).exists() else read_bundle_metadata((REPO_ROOT / "dist" / latest["filename"]))
+            if isinstance(latest_meta, dict):
+                for key in ("name", "port", "open_path"):
+                    if latest_meta.get(key) and not m.get(key):
+                        m[key] = latest_meta.get(key)
         installed_ver = m.get("installed_version") or m.get("version")
         m["installed_version"] = installed_ver
         m["latest_version"] = latest["version"] if latest else installed_ver
