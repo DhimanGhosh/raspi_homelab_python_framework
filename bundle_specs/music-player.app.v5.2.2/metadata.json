@@ -1,0 +1,10 @@
+{
+  "id": "music-player",
+  "name": "Music Player",
+  "version": "5.2.2",
+  "port": 8459,
+  "open_path": "/",
+  "health_url": "http://127.0.0.1:8139/api/health",
+  "local_upstream": "http://127.0.0.1:8139",
+  "health_timeout": 120
+}

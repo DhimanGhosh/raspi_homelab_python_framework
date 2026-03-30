@@ -1,0 +1,9 @@
+{
+  "name": "Music Player",
+  "short_name": "Music",
+  "display": "standalone",
+  "background_color": "#0a0c11",
+  "theme_color": "#0a0c11",
+  "start_url": "/",
+  "scope": "/"
+}

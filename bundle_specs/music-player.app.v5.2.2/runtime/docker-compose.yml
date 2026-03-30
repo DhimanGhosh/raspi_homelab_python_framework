@@ -1,0 +1,14 @@
+services:
+  music-player:
+    build: .
+    container_name: music-player
+    restart: unless-stopped
+    command: ["/usr/local/bin/python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8139"]
+    ports:
+      - "127.0.0.1:8139:8139"
+    environment:
+      MUSIC_ROOT: /mnt/nas/media/music
+      APP_DATA_DIR: /mnt/nas/homelab/runtime/music-player/data
+    volumes:
+      - /mnt/nas/media/music:/mnt/nas/media/music:ro
+      - /mnt/nas/homelab/runtime/music-player/data:/mnt/nas/homelab/runtime/music-player/data
