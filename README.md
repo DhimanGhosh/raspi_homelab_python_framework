@@ -22,17 +22,6 @@ cd ~/homelab_os
 python3 bootstrap.py
 source .venv/bin/activate
 homelabctl bootstrap-host --env-file .env
-homelabctl show-settings --env-file .env
+homelabctl build-all-plugins --env-file .env
+homelabctl install-plugin build/test_plugin.tgz --env-file .env
 ```
-
-
-## Important installation note
-
-Always work inside the virtual environment before running `pip install -e .`:
-
-```bash
-cd ~/homelab_os
-source .venv/bin/activate
-```
-
-If you run `pip install -e .` outside the virtual environment on Debian/Raspberry Pi OS, you may see the `externally-managed-environment` error from PEP 668.
