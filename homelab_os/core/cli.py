@@ -66,12 +66,16 @@ def install_plugin(plugin_archive: Path, env_file: str = ".env") -> None:
     ensure_runtime_dirs(settings)
 
     installer = PluginInstaller(
+        settings=settings,
         installed_plugins_dir=settings.runtime_installed_plugins_dir,
         registry_file=settings.manifests_dir / "installed_plugins.json",
     )
     result = installer.install_plugin(plugin_archive)
+
     typer.echo(f"Installed plugin: {result['name']} ({result['version']})")
     typer.echo(f"Installed dir: {result['installed_dir']}")
+    if result.get("public_url"):
+        typer.echo(f"Open URL: {result['public_url']}")
 
 
 @app.command("run-control-shell")

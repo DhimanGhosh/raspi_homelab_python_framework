@@ -9,6 +9,20 @@
         "internal_port": 9999
       },
       "entrypoint": {}
+    },
+    "pihole": {
+      "id": "pihole",
+      "name": "Pi-hole",
+      "version": "1.0.0",
+      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/pihole",
+      "network": {
+        "internal_port": 8080
+      },
+      "entrypoint": {
+        "type": "web",
+        "path": "/admin/"
+      },
+      "public_url": "https://pi-nas.taild4713b.ts.net:8447/admin/"
     }
   }
 }

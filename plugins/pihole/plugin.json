@@ -1,0 +1,12 @@
+{
+  "id": "pihole",
+  "name": "Pi-hole",
+  "version": "1.0.0",
+  "network": {
+    "internal_port": 8080
+  },
+  "entrypoint": {
+    "type": "web",
+    "path": "/admin/"
+  }
+}

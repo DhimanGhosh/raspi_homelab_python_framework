@@ -2,25 +2,29 @@
 
 Plugin-based Raspberry Pi homelab control platform.
 
-## Step 1 status
-
-This repo currently includes:
-
-- bootstrap flow
-- Python packaging
-- CLI foundation
-- config loading
-- FastAPI core app foundation
-- runtime directory initialization
-
-Plugin builder, installer, runtime, reverse proxy, and migrated plugins will be added in the next steps.
-
 ## Quick start
 
 ```bash
 cd ~/homelab_os
 python3 bootstrap.py
 source .venv/bin/activate
-homelabctl bootstrap-host --env-file .env
-homelabctl show-settings --env-file .env
+pip install -e .
+homelabctl build-all-plugins --env-file .env
+homelabctl install-plugin build/test_plugin.tgz --env-file .env
 ```
+
+## Current coverage
+
+- bootstrap flow
+- Python packaging
+- CLI foundation
+- config loading
+- plugin validator, builder, installer, runtime metadata, registry
+- reverse proxy snippet generation with automatic Caddy validation and reload
+- sample `test_plugin`
+- Pi-hole plugin with cloudflared sidecar
+
+## Notes
+
+- `install-plugin` uses a positional archive argument.
+- Caddy operations use `sudo` only for reading the main Caddyfile, writing snippets, validating config, and reloading the service.

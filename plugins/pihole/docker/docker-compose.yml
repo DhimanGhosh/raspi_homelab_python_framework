@@ -1,0 +1,39 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: pihole-cloudflared
+    command: proxy-dns --port 5053 --upstream https://1.1.1.1/dns-query --upstream https://1.0.0.1/dns-query
+    restart: unless-stopped
+    networks:
+      - pihole_net
+
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    hostname: pi-nas
+    restart: unless-stopped
+    depends_on:
+      - cloudflared
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "127.0.0.1:8080:80/tcp"
+    environment:
+      TZ: "Asia/Kolkata"
+      FTLCONF_webserver_api_password: "admin"
+      FTLCONF_dns_upstreams: "cloudflared#5053"
+      FTLCONF_dns_interface: "eth0"
+      FTLCONF_dns_listeningMode: "LOCAL"
+      FTLCONF_dns_dnssec: "true"
+      FTLCONF_dns_revServers: "false,192.168.88.0/24,192.168.88.1,lan"
+    volumes:
+      - /mnt/nas/homelab/apps/pihole/etc-pihole:/etc/pihole
+      - /mnt/nas/homelab/apps/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - pihole_net
+
+networks:
+  pihole_net:
+    driver: bridge
