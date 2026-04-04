@@ -2,7 +2,7 @@
 
 Plugin-based Raspberry Pi homelab control platform.
 
-## Step 1 status
+## status
 
 This repo currently includes:
 
