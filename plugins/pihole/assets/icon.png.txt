@@ -1,1 +1,0 @@
-Placeholder icon for Pi-hole. Replace with a real PNG named icon.png if desired.

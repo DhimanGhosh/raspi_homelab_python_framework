@@ -1,9 +1,0 @@
-services:
-  voice-ai:
-    build: .
-    container_name: pi-voice-ai
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8124:8124"
-    environment:
-      PI_VOICE_AI_TOKEN: homelabtoken

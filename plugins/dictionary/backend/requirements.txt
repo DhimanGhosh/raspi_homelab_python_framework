@@ -1,4 +1,0 @@
-fastapi>=0.115
-uvicorn[standard]>=0.30
-nltk>=3.9
-wordfreq>=3.1

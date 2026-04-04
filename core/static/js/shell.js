@@ -1,1 +1,0 @@
-window.HomelabShell={mount(id){return document.getElementById(id)}};

@@ -1,8 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "homelab_os"
 version = "3.1.0"
-dependencies = ["typer", "fastapi"]
+description = "Plugin-based Raspberry Pi homelab OS"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "Flask>=3.1.0",
+    "waitress>=3.0.0",
+    "typer>=0.12.3",
+    "requests>=2.31.0",
+    "docker>=7.1.0",
+    "PyYAML>=6.0.2",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+]
 
 [project.scripts]
 homelabctl = "homelab_os.core.cli:app"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["homelab_os*"]
+exclude = ["tests*", "runtime*", "build*"]

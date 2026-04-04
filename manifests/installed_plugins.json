@@ -1,0 +1,14 @@
+{
+  "plugins": {
+    "test-plugin": {
+      "id": "test-plugin",
+      "name": "Test Plugin",
+      "version": "1.0.0",
+      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/test-plugin",
+      "network": {
+        "internal_port": 9999
+      },
+      "entrypoint": {}
+    }
+  }
+}
