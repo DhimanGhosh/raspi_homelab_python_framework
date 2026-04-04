@@ -1,7 +1,7 @@
 {
   "id": "link-downloader",
   "name": "Media Downloader",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "port": 8460,
   "open_path": "/",
   "health_url": "http://127.0.0.1:8160/api/health",

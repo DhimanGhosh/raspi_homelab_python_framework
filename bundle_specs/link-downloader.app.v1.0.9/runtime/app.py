@@ -13,7 +13,7 @@ import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse, unquote, quote
+from urllib.parse import urlparse, unquote, quote, parse_qs
 
 APP_DATA_DIR = Path(os.environ.get('APP_DATA_DIR', '/data'))
 DOWNLOAD_ROOT = Path(os.environ.get('DOWNLOAD_ROOT', str(APP_DATA_DIR / 'downloads')))
@@ -100,6 +100,14 @@ def update_job(job_id: str, **fields):
             job.setdefault('log', []).append(log_line)
             if len(job['log']) > 120:
                 job['log'] = job['log'][-120:]
+
+
+def clear_finished_jobs():
+    with JOBS_LOCK:
+        remove_ids = [jid for jid, job in JOBS.items() if job.get('status') in ('completed', 'failed')]
+        for jid in remove_ids:
+            JOBS.pop(jid, None)
+        return len(remove_ids)
 
 
 def safe_name(text: str) -> str:
@@ -434,7 +442,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         self.end_headers()
 
-    def _serve_file(self, full: Path, attachment: bool):
+    def _serve_file(self, full: Path, attachment: bool, download_name: str | None = None):
         if not full.exists() or not full.is_file() or (APP_DATA_DIR.resolve() not in full.resolve().parents and full.resolve() != APP_DATA_DIR.resolve()):
             json_response(self, {'error': 'not found'}, HTTPStatus.NOT_FOUND)
             return
@@ -443,15 +451,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header('Content-Type', mime)
         self.send_header('Content-Length', str(len(body)))
+        filename = safe_name(download_name or full.name)
         if attachment:
-            self.send_header('Content-Disposition', f'attachment; filename="{full.name}"')
+            self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
         else:
-            self.send_header('Content-Disposition', f'inline; filename="{full.name}"')
+            self.send_header('Content-Disposition', f'inline; filename="{filename}"')
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
         if parsed.path == '/':
             body = (STATIC_DIR / 'index.html').read_bytes()
             self.send_response(HTTPStatus.OK)
@@ -486,7 +496,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path.startswith('/downloaded/'):
             rel = unquote(parsed.path[len('/downloaded/'):])
             full = APP_DATA_DIR / rel
-            return self._serve_file(full, attachment=True)
+            download_name = (qs.get('filename') or [None])[0]
+            return self._serve_file(full, attachment=True, download_name=download_name)
         if parsed.path.startswith('/open/'):
             rel = unquote(parsed.path[len('/open/'):])
             full = APP_DATA_DIR / rel
@@ -537,6 +548,10 @@ class Handler(BaseHTTPRequestHandler):
             job_id = new_job('save-as', {'relative_path': rel, 'destination_path': destination_path, 'new_name': new_name, 'operation': operation})
             threading.Thread(target=run_save_as, args=(job_id, rel, destination_path, new_name, operation), daemon=True).start()
             json_response(self, {'ok': True, 'job_id': job_id})
+            return
+        if parsed.path == '/api/clear-jobs':
+            removed = clear_finished_jobs()
+            json_response(self, {'ok': True, 'removed': removed})
             return
         if parsed.path == '/api/upload-convert':
             form = parse_multipart(self)
