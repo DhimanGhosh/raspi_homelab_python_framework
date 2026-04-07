@@ -72,6 +72,21 @@
         "status_code": 200,
         "url": "http://127.0.0.1:9999/"
       }
+    },
+    "fee83224-0859-4c84-9932-9354cbe7e853": {
+      "job_id": "fee83224-0859-4c84-9932-9354cbe7e853",
+      "job_type": "build_all_plugins",
+      "target": "all",
+      "status": "completed",
+      "progress": 100,
+      "created_at": "2026-04-07T21:48:00",
+      "updated_at": "2026-04-07T21:48:00",
+      "metadata": {
+        "plugins_dir": "/home/pi/homelab_os/plugins"
+      },
+      "result": {
+        "count": 2
+      }
     }
   }
 }
