@@ -21,6 +21,39 @@
         "url": "https://pi-nas.taild4713b.ts.net:8447/admin/",
         "error": "<urlopen error [Errno -2] Name or service not known>"
       }
+    },
+    "music-player": {
+      "status": "running",
+      "runtime_type": "python",
+      "last_action": "start",
+      "pid": 338534,
+      "stdout_log": "/home/pi/homelab_os/runtime/installed_plugins/_logs/music-player.out.log",
+      "stderr_log": "/home/pi/homelab_os/runtime/installed_plugins/_logs/music-player.err.log",
+      "public_url": null
+    },
+    "link-downloader": {
+      "status": "running",
+      "runtime_type": "python",
+      "last_action": "start",
+      "pid": 338644,
+      "stdout_log": "/home/pi/homelab_os/runtime/installed_plugins/_logs/link-downloader.out.log",
+      "stderr_log": "/home/pi/homelab_os/runtime/installed_plugins/_logs/link-downloader.err.log",
+      "public_url": null,
+      "last_healthcheck": {
+        "ok": false,
+        "status_code": null,
+        "url": "https://pi-nas.taild4713b.ts.net:8460/",
+        "error": "<urlopen error [Errno -2] Name or service not known>"
+      }
+    },
+    "status": {
+      "status": "running",
+      "runtime_type": "python",
+      "last_action": "start",
+      "pid": 338704,
+      "stdout_log": "/home/pi/homelab_os/runtime/installed_plugins/_logs/status.out.log",
+      "stderr_log": "/home/pi/homelab_os/runtime/installed_plugins/_logs/status.err.log",
+      "public_url": null
     }
   }
 }

@@ -22,6 +22,9 @@ cd ~/homelab_os
 python3 bootstrap.py
 source .venv/bin/activate
 homelabctl bootstrap-host --env-file .env
+
 homelabctl build-all-plugins --env-file .env
-homelabctl install-plugin build/test_plugin.tgz --env-file .env
+
+homelabctl install-plugin build/music-player.tgz --env-file .env
+homelabctl start-plugin music-player --env-file .env
 ```

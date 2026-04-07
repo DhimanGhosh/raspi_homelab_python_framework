@@ -51,3 +51,21 @@ class JobStore:
         jobs = list(self._read().get("jobs", {}).values())
         jobs.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
         return jobs
+
+    def clear_completed(self) -> int:
+        data = self._read()
+        before = len(data.get("jobs", {}))
+        data["jobs"] = {
+            job_id: payload
+            for job_id, payload in data.get("jobs", {}).items()
+            if payload.get("status") not in {"completed", "success"}
+        }
+        self._write(data)
+        return before - len(data["jobs"])
+
+    def clear_all(self) -> int:
+        data = self._read()
+        before = len(data.get("jobs", {}))
+        data["jobs"] = {}
+        self._write(data)
+        return before

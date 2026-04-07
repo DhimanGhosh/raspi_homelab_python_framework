@@ -1,0 +1,7 @@
+{
+  "id": "link-downloader",
+  "name": "Media Downloader",
+  "version": "1.0.9",
+  "network": { "internal_port": 18160 },
+  "entrypoint": { "type": "web", "path": "/" }
+}

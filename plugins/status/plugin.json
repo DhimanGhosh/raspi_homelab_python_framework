@@ -1,0 +1,7 @@
+{
+  "id": "status",
+  "name": "Pi Status Board",
+  "version": "1.3.0",
+  "network": { "internal_port": 18151 },
+  "entrypoint": { "type": "web", "path": "/" }
+}
