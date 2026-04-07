@@ -31,7 +31,7 @@
       "version": "1.0.9",
       "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/link-downloader",
       "network": {
-        "internal_port": 18160
+        "internal_port": 8160
       },
       "entrypoint": {
         "type": "web",
