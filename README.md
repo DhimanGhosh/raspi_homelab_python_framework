@@ -4,7 +4,7 @@ Plugin-based Raspberry Pi homelab control platform.
 
 ## Status
 
-This repo currently includes:
+This repo includes:
 
 - bootstrap flow
 - Python packaging
