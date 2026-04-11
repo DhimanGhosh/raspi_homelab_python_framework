@@ -80,10 +80,12 @@
       "stderr": " Network docker_default  Removing\n Network docker_default  Resource is still in use\n"
     },
     "personal-library": {
-      "status": "stopped",
-      "last_action": "stop",
+      "status": "running",
+      "runtime_type": "docker",
+      "last_action": "start",
       "stdout": "",
-      "stderr": " Network docker_default  Removing\n Network docker_default  Resource is still in use\n"
+      "stderr": " Network docker_default  Creating\n Network docker_default  Created\n Container personal-library  Creating\n Container personal-library  Created\n Container personal-library  Starting\n Container personal-library  Started\n",
+      "public_url": "https://pi-nas.taild4713b.ts.net:8454/"
     }
   }
 }

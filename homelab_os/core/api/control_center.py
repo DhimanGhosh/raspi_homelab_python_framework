@@ -133,7 +133,7 @@ def control_center_summary() -> dict:
         "notifications": [],
     }
 
-def _install_job(job_id: str, archive_path: str) -> None:
+def _install_job(job_id: str, archive_path: str, auto_start: bool = False) -> None:
     settings, registry, jobs, logs, runtime, installer, proxy = _services()
     try:
         jobs.update_job(job_id, status="running", progress=10)
@@ -142,32 +142,16 @@ def _install_job(job_id: str, archive_path: str) -> None:
         logs.append_job_log(job_id, f"Installed plugin: {result['name']} ({result['version']})")
         if result.get("public_url"):
             logs.append_job_log(job_id, f"Open URL: {result['public_url']}")
+        if auto_start:
+            plugin_id = result["id"]
+            jobs.update_job(job_id, progress=70)
+            logs.append_job_log(job_id, f"Auto-starting plugin {plugin_id}")
+            start_result = runtime.start_plugin(plugin_id)
+            logs.append_job_log(job_id, f"Start result: {start_result}")
+            result["start_result"] = start_result
         jobs.update_job(job_id, status="completed", progress=100, result=result)
     except Exception as exc:
         logs.append_job_log(job_id, f"Install failed: {exc}")
-        jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
-
-def _runtime_job(job_id: str, action: str, plugin_id: str) -> None:
-    settings, registry, jobs, logs, runtime, installer, proxy = _services()
-    try:
-        jobs.update_job(job_id, status="running", progress=25)
-        logs.append_job_log(job_id, f"{action} plugin {plugin_id}")
-        if action == "start":
-            result = runtime.start_plugin(plugin_id)
-        elif action == "stop":
-            result = runtime.stop_plugin(plugin_id)
-        elif action == "restart":
-            result = runtime.restart_plugin(plugin_id)
-        elif action == "healthcheck":
-            result = runtime.healthcheck_plugin(plugin_id)
-        elif action == "uninstall":
-            result = installer.uninstall_plugin(plugin_id)
-        else:
-            raise RuntimeError(f"Unsupported action: {action}")
-        logs.append_job_log(job_id, str(result))
-        jobs.update_job(job_id, status="completed", progress=100, result=result)
-    except Exception as exc:
-        logs.append_job_log(job_id, f"{action} failed: {exc}")
         jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
 
 @router.post("/control-center/install")
@@ -176,9 +160,9 @@ def control_center_install(archive_path: str, background_tasks: BackgroundTasks)
     archive = Path(archive_path)
     if not archive.exists():
         raise HTTPException(status_code=404, detail=f"Archive not found: {archive}")
-    job = jobs.create_job("install_plugin", archive_path, {"archive": archive_path})
+    job = jobs.create_job("install_plugin", archive_path, {"archive": archive_path, "auto_start": True})
     logs.append_job_log(job["job_id"], "Queued install job")
-    background_tasks.add_task(_install_job, job["job_id"], archive_path)
+    background_tasks.add_task(_install_job, job["job_id"], archive_path, True)
     return {"job_id": job["job_id"]}
 
 @router.post("/control-center/apps/{app_id}/install-bundle/{filename}")
@@ -187,9 +171,9 @@ def install_specific_bundle(app_id: str, filename: str, background_tasks: Backgr
     archive = settings.build_dir / filename
     if not archive.exists():
         raise HTTPException(status_code=404, detail=f"Bundle not found: {filename}")
-    job = jobs.create_job("install_plugin", str(archive), {"archive": str(archive), "app_id": app_id})
+    job = jobs.create_job("install_plugin", str(archive), {"archive": str(archive), "app_id": app_id, "auto_start": True})
     logs.append_job_log(job["job_id"], f"Queued install for {filename}")
-    background_tasks.add_task(_install_job, job["job_id"], str(archive))
+    background_tasks.add_task(_install_job, job["job_id"], str(archive), True)
     return {"job_id": job["job_id"]}
 
 @router.post("/control-center/bundles/{filename}/delete")
@@ -224,9 +208,9 @@ def install_all(background_tasks: BackgroundTasks) -> dict:
         if app_id == "control-center":
             continue
         for bundle in bundles:
-            job = jobs.create_job("install_plugin", bundle["path"], {"archive": bundle["path"], "app_id": app_id})
+            job = jobs.create_job("install_plugin", bundle["path"], {"archive": bundle["path"], "app_id": app_id, "auto_start": True})
             logs.append_job_log(job["job_id"], f"Queued install for {bundle['filename']}")
-            background_tasks.add_task(_install_job, job["job_id"], bundle["path"])
+            background_tasks.add_task(_install_job, job["job_id"], bundle["path"], True)
             count += 1
             break
     return {"ok": True, "queued": count}
@@ -234,8 +218,8 @@ def install_all(background_tasks: BackgroundTasks) -> dict:
 @router.post("/control-center/update-all")
 def update_all(background_tasks: BackgroundTasks) -> dict:
     settings, catalog, jobs = _catalog_with_runtime()
-    count = 0
     logs = LoggingService(settings.runtime_jobs_dir)
+    count = 0
     for app in catalog:
         if app["installed"] and app["id"] != "control-center":
             job = jobs.create_job("restart_plugin", app["id"], {"plugin_id": app["id"]})
@@ -243,6 +227,29 @@ def update_all(background_tasks: BackgroundTasks) -> dict:
             background_tasks.add_task(_runtime_job, job["job_id"], "restart", app["id"])
             count += 1
     return {"ok": True, "queued": count}
+
+def _runtime_job(job_id: str, action: str, plugin_id: str) -> None:
+    settings, registry, jobs, logs, runtime, installer, proxy = _services()
+    try:
+        jobs.update_job(job_id, status="running", progress=25)
+        logs.append_job_log(job_id, f"{action} plugin {plugin_id}")
+        if action == "start":
+            result = runtime.start_plugin(plugin_id)
+        elif action == "stop":
+            result = runtime.stop_plugin(plugin_id)
+        elif action == "restart":
+            result = runtime.restart_plugin(plugin_id)
+        elif action == "healthcheck":
+            result = runtime.healthcheck_plugin(plugin_id)
+        elif action == "uninstall":
+            result = installer.uninstall_plugin(plugin_id)
+        else:
+            raise RuntimeError(f"Unsupported action: {action}")
+        logs.append_job_log(job_id, str(result))
+        jobs.update_job(job_id, status="completed", progress=100, result=result)
+    except Exception as exc:
+        logs.append_job_log(job_id, f"{action} failed: {exc}")
+        jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
 
 @router.post("/control-center/plugins/{plugin_id}/{action}")
 def control_center_plugin_action(plugin_id: str, action: str, background_tasks: BackgroundTasks) -> dict:

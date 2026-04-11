@@ -17,18 +17,22 @@ class PluginRegistry:
     def _write(self, data: dict) -> None:
         self.registry_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    def register(self, plugin_id: str, metadata: dict) -> None:
-        data = self._read()
-        data["plugins"][plugin_id] = metadata
-        self._write(data)
+    def list_all(self) -> dict:
+        return self._read().get("plugins", {})
 
-    def unregister(self, plugin_id: str) -> None:
-        data = self._read()
-        data.get("plugins", {}).pop(plugin_id, None)
-        self._write(data)
-
-    def get(self, plugin_id: str) -> dict | None:
+    def get_plugin(self, plugin_id: str) -> dict | None:
         return self._read().get("plugins", {}).get(plugin_id)
 
-    def list_all(self) -> dict[str, dict]:
-        return self._read().get("plugins", {})
+    def upsert_plugin(self, plugin_data: dict) -> dict:
+        data = self._read()
+        plugin_id = plugin_data["id"]
+        data.setdefault("plugins", {})
+        data["plugins"][plugin_id] = plugin_data
+        self._write(data)
+        return plugin_data
+
+    def remove_plugin(self, plugin_id: str) -> None:
+        data = self._read()
+        if plugin_id in data.get("plugins", {}):
+            del data["plugins"][plugin_id]
+            self._write(data)
