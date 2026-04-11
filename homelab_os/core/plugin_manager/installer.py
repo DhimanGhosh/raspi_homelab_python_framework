@@ -29,6 +29,7 @@ class PluginInstaller:
         self.lifecycle = PluginLifecycle()
         self.validator = PluginValidator()
         self.reverse_proxy = ReverseProxyService(settings)
+        self.state_file = state_file
 
     def install_plugin(self, archive_path: Path) -> dict:
         if not archive_path.exists():
@@ -82,3 +83,30 @@ class PluginInstaller:
 
         self.registry.register(plugin_id, runtime_metadata)
         return runtime_metadata
+
+    def uninstall_plugin(self, plugin_id: str) -> dict:
+        plugin_dir = self.installed_plugins_dir / plugin_id
+        if not plugin_dir.exists():
+            raise FileNotFoundError(f"Installed plugin not found: {plugin_dir}")
+
+        try:
+            self.runtime.stop_plugin(plugin_id)
+        except Exception:
+            pass
+
+        try:
+            self.reverse_proxy.remove_plugin_route(plugin_id)
+        except Exception:
+            pass
+
+        self.registry.unregister(plugin_id)
+
+        runtime_file = self.installed_plugins_dir / plugin_id / "runtime.json"
+        if runtime_file.exists():
+            try:
+                runtime_file.unlink()
+            except Exception:
+                pass
+
+        shutil.rmtree(plugin_dir, ignore_errors=True)
+        return {"plugin_id": plugin_id, "status": "uninstalled"}

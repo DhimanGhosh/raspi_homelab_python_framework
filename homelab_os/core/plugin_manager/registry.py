@@ -8,7 +8,6 @@ class PluginRegistry:
     def __init__(self, registry_file: Path) -> None:
         self.registry_file = registry_file
         self.registry_file.parent.mkdir(parents=True, exist_ok=True)
-
         if not self.registry_file.exists():
             self._write({"plugins": {}})
 
@@ -20,20 +19,16 @@ class PluginRegistry:
 
     def register(self, plugin_id: str, metadata: dict) -> None:
         data = self._read()
-        data.setdefault("plugins", {})
         data["plugins"][plugin_id] = metadata
         self._write(data)
 
     def unregister(self, plugin_id: str) -> None:
         data = self._read()
-        data.setdefault("plugins", {})
-        data["plugins"].pop(plugin_id, None)
+        data.get("plugins", {}).pop(plugin_id, None)
         self._write(data)
 
     def get(self, plugin_id: str) -> dict | None:
-        data = self._read()
-        return data.get("plugins", {}).get(plugin_id)
+        return self._read().get("plugins", {}).get(plugin_id)
 
     def list_all(self) -> dict[str, dict]:
-        data = self._read()
-        return data.get("plugins", {})
+        return self._read().get("plugins", {})

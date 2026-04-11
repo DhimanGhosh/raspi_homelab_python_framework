@@ -72,12 +72,8 @@ def _bundle_groups(settings: object) -> dict:
     for file in build_dir.iterdir():
         if not file.is_file() or file.suffix != ".tgz":
             continue
-        stem = file.stem.replace("_", "-")
-        app_id = stem
-        grouped.setdefault(app_id, []).append({
-            "filename": file.name,
-            "path": str(file),
-        })
+        app_id = file.stem.replace("_", "-")
+        grouped.setdefault(app_id, []).append({"filename": file.name, "path": str(file)})
     return grouped
 
 def _catalog_with_runtime():
@@ -149,6 +145,29 @@ def _install_job(job_id: str, archive_path: str) -> None:
         jobs.update_job(job_id, status="completed", progress=100, result=result)
     except Exception as exc:
         logs.append_job_log(job_id, f"Install failed: {exc}")
+        jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
+
+def _runtime_job(job_id: str, action: str, plugin_id: str) -> None:
+    settings, registry, jobs, logs, runtime, installer, proxy = _services()
+    try:
+        jobs.update_job(job_id, status="running", progress=25)
+        logs.append_job_log(job_id, f"{action} plugin {plugin_id}")
+        if action == "start":
+            result = runtime.start_plugin(plugin_id)
+        elif action == "stop":
+            result = runtime.stop_plugin(plugin_id)
+        elif action == "restart":
+            result = runtime.restart_plugin(plugin_id)
+        elif action == "healthcheck":
+            result = runtime.healthcheck_plugin(plugin_id)
+        elif action == "uninstall":
+            result = installer.uninstall_plugin(plugin_id)
+        else:
+            raise RuntimeError(f"Unsupported action: {action}")
+        logs.append_job_log(job_id, str(result))
+        jobs.update_job(job_id, status="completed", progress=100, result=result)
+    except Exception as exc:
+        logs.append_job_log(job_id, f"{action} failed: {exc}")
         jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
 
 @router.post("/control-center/install")
@@ -225,30 +244,9 @@ def update_all(background_tasks: BackgroundTasks) -> dict:
             count += 1
     return {"ok": True, "queued": count}
 
-def _runtime_job(job_id: str, action: str, plugin_id: str) -> None:
-    settings, registry, jobs, logs, runtime, installer, proxy = _services()
-    try:
-        jobs.update_job(job_id, status="running", progress=25)
-        logs.append_job_log(job_id, f"{action} plugin {plugin_id}")
-        if action == "start":
-            result = runtime.start_plugin(plugin_id)
-        elif action == "stop":
-            result = runtime.stop_plugin(plugin_id)
-        elif action == "restart":
-            result = runtime.restart_plugin(plugin_id)
-        elif action == "healthcheck":
-            result = runtime.healthcheck_plugin(plugin_id)
-        else:
-            raise RuntimeError(f"Unsupported action: {action}")
-        logs.append_job_log(job_id, str(result))
-        jobs.update_job(job_id, status="completed", progress=100, result=result)
-    except Exception as exc:
-        logs.append_job_log(job_id, f"{action} failed: {exc}")
-        jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
-
 @router.post("/control-center/plugins/{plugin_id}/{action}")
 def control_center_plugin_action(plugin_id: str, action: str, background_tasks: BackgroundTasks) -> dict:
-    if action not in {"start", "stop", "restart", "healthcheck"}:
+    if action not in {"start", "stop", "restart", "healthcheck", "uninstall"}:
         raise HTTPException(status_code=400, detail="Unsupported action")
     settings, registry, jobs, logs, runtime, installer, proxy = _services()
     job = jobs.create_job(f"{action}_plugin", plugin_id, {"plugin_id": plugin_id})
