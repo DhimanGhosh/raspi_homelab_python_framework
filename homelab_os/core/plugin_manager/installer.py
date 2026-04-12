@@ -34,6 +34,9 @@ class PluginInstaller:
             raise FileNotFoundError(f"plugin.json not found in {plugin_dir}")
         return json.loads(manifest_path.read_text(encoding="utf-8"))
 
+    def _docker_compose_cmd(self, plugin_id: str, *args: str) -> list[str]:
+        return ["docker", "compose", "-p", plugin_id, *args]
+
     def _prepare_public_url(self, plugin_id: str, manifest: dict) -> str | None:
         internal_port = manifest.get("network", {}).get("internal_port")
         if not internal_port:
@@ -41,7 +44,6 @@ class PluginInstaller:
         return self.proxy.apply_plugin_route(plugin_id, int(internal_port))
 
     def _cleanup_existing_install(self, plugin_id: str) -> None:
-        # Reinstall must be idempotent. Clean existing runtime, route, registry, and state first.
         existing = self.registry.get_plugin(plugin_id)
         if existing:
             self.uninstall_plugin(plugin_id)
@@ -53,7 +55,6 @@ class PluginInstaller:
             try:
                 self.proxy.remove_plugin_route(plugin_id)
             except Exception:
-                # ignore missing route or prior bad state during cleanup
                 pass
 
     def install_plugin(self, archive_path: Path) -> dict:
@@ -106,7 +107,11 @@ class PluginInstaller:
 
         compose_dir = plugin_dir / "docker"
         if compose_dir.exists() and (compose_dir / "docker-compose.yml").exists():
-            self.runner.run(["docker", "compose", "-p", plugin_id, "down", "--remove-orphans", "-v"], cwd=compose_dir, check=False)
+            self.runner.run(
+                self._docker_compose_cmd(plugin_id, "down", "--remove-orphans", "-v"),
+                cwd=compose_dir,
+                check=False,
+            )
 
         self.runner.run(["docker", "rm", "-f", plugin_id], check=False)
         self.proxy.remove_plugin_route(plugin_id)
