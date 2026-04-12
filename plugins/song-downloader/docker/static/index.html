@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Song Downloader</title>
+  <style>
+    :root {
+      --bg: #07101d;
+      --panel: #0d1e35;
+      --panel2: #0b1930;
+      --text: #f5f7ff;
+      --muted: #9bb3da;
+      --accent: #8f84ff;
+      --accent2: #6ca8ff;
+      --border: #20355d
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text)
+    }
+
+    .page {
+      max-width: 1050px;
+      margin: 0 auto;
+      padding: 18px
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 20px;
+      margin-bottom: 18px
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0 0 10px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #071424;
+      font-size: 13px
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px
+    }
+
+    .full {
+      grid-column: 1/-1
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .row>* {
+      flex: 1
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px
+    }
+
+    input {
+      width: 100%;
+      background: #081428;
+      color: #fff;
+      border: 1px solid #223b63;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 16px
+    }
+
+    button {
+      border: 0;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 16px;
+      font-weight: 800;
+      cursor: pointer
+    }
+
+    .job {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      margin-top: 12px;
+      background: rgba(255, 255, 255, .02)
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere
+    }
+
+    .progress {
+      height: 10px;
+      background: #10203b;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 10px
+    }
+
+    .bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%
+    }
+
+    @media(max-width:780px) {
+      .grid {
+        grid-template-columns: 1fr
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="row" style="align-items:flex-start;justify-content:space-between">
+        <div style="flex:3">
+          <h1>Song Downloader</h1>
+          <p class="muted">Search by song name and artists, download the full audio song, optionally rename it, and
+            auto-transfer it into <span class="mono">/mnt/nas/media/music</span>.</p>
+        </div>
+        <div style="flex:1;text-align:right"><span class="pill">Port 8445</span></div>
+      </div>
+      <p class="muted" id="apiNote"></p>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div><label for="song">Song name</label><input id="song" placeholder="Jonaki"></div>
+        <div><label for="artists">Artist name(s)</label><input id="artists" placeholder="Papon"></div>
+        <div><label for="album">Album / movie name (optional)</label><input id="album" placeholder="Bhooter Bhabishyat">
+        </div>
+        <div><label for="rename">Rename stem (optional)</label><input id="rename" placeholder="Jonaki - Papon"></div>
+        <div class="full"><label for="dest">Destination path</label><input id="dest" placeholder="/mnt/nas/media/music">
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px;align-items:center">
+        <button id="downloadBtn" style="max-width:260px">Download full audio song</button>
+        <div class="muted">Final filename format is expected to be <span class="mono">&lt;song name&gt; - &lt;comma
+            separated artists&gt;.mp3</span>.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Jobs</h2>
+      <div id="jobs"></div>
+    </div>
+  </div>
+  <script>
+    const jobsEl = document.getElementById('jobs');
+    const apiNote = document.getElementById('apiNote');
+    const destInput = document.getElementById('dest');
+
+    async function fetchStatus() {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      apiNote.textContent = data.note + ' Backend in use now: ' + (data.media_downloader_available ? 'Media Downloader API' : 'direct yt-dlp fallback');
+      if (!destInput.value) destInput.value = data.default_destination || '/mnt/nas/media/music';
+      renderJobs(data.jobs || []);
+    }
+
+    function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    function renderJobs(jobs) {
+      if (!jobs.length) { jobsEl.innerHTML = '<div class="muted">No jobs yet.</div>'; return; }
+      jobsEl.innerHTML = jobs.map(job => `
+        <div class="job">
+          <div><strong>${escapeHtml(job.payload.song_name)}</strong> — ${escapeHtml(job.payload.artists)}</div>
+          <div class="muted">Status: ${escapeHtml(job.status)} · ${escapeHtml(job.message || '')}</div>
+          <div class="muted">Backend: ${escapeHtml(job.download_backend || 'pending')}</div>
+          ${job.final_path ? `<div class="mono">${escapeHtml(job.final_path)}</div>` : ''}
+          <div class="progress"><div class="bar" style="width:${Number(job.progress || 0)}%"></div></div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', async () => {
+      const payload = {
+        song_name: document.getElementById('song').value.trim(),
+        artists: document.getElementById('artists').value.trim(),
+        album_name: document.getElementById('album').value.trim(),
+        rename_to: document.getElementById('rename').value.trim(),
+        destination_path: document.getElementById('dest').value.trim(),
+      };
+      const res = await fetch('/api/download-song', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Request failed'); return; }
+      fetchStatus();
+    });
+
+    fetchStatus();
+    setInterval(fetchStatus, 2500);
+  </script>
+</body>
+
+</html>

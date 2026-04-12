@@ -20,7 +20,6 @@ APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 ROOT = Path(__file__).resolve().parent
 TEMPLATES_DIR = ROOT / 'templates'
-STATIC_DIR = ROOT / 'static'
 
 
 def render_index_html() -> str:
@@ -91,6 +90,13 @@ def folders_tree(tracks):
     return [{'path': f, 'name': Path(f).name} for f in seen]
 
 
+def resolve_target(rel: str) -> Path | None:
+    target = (MUSIC_ROOT / rel).resolve()
+    if not target.exists() or not target.is_file() or (MUSIC_ROOT != target and MUSIC_ROOT not in target.parents):
+        return None
+    return target
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = 'MusicPlayer/' + APP_VERSION
 
@@ -98,80 +104,108 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         super().end_headers()
 
-    def _json(self, payload, code=200):
-        data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    def _json_bytes(self, payload) -> bytes:
+        return json.dumps(payload, ensure_ascii=False).encode('utf-8')
+
+    def _json(self, payload, code=200, include_body=True):
+        data = self._json_bytes(payload)
         self.send_response(code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        if include_body:
+            self.wfile.write(data)
 
-    def _html(self, text, code=200):
+    def _html(self, text, code=200, include_body=True):
         data = text.encode('utf-8')
         self.send_response(code)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        if include_body:
+            self.wfile.write(data)
+
+    def _send_stream_headers(self, target: Path, start: int | None = None, end: int | None = None, head_only: bool = False):
+        ctype = mimetypes.guess_type(target.name)[0] or 'application/octet-stream'
+        size = target.stat().st_size
+        if start is not None or end is not None:
+            stream_start = max(start or 0, 0)
+            stream_end = min(end if end is not None else size - 1, size - 1)
+            if stream_start > stream_end:
+                stream_start, stream_end = 0, size - 1
+            length = stream_end - stream_start + 1
+            self.send_response(206)
+            self.send_header('Content-Type', ctype)
+            self.send_header('Accept-Ranges', 'bytes')
+            self.send_header('Content-Range', f'bytes {stream_start}-{stream_end}/{size}')
+            self.send_header('Content-Length', str(length))
+            self.end_headers()
+            return stream_start, length
+        self.send_response(200)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(size))
+        self.send_header('Accept-Ranges', 'bytes')
+        self.end_headers()
+        return 0, size
 
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Range')
         self.end_headers()
 
+    def do_HEAD(self):
+        self._handle_request(head_only=True)
+
     def do_GET(self):
+        self._handle_request(head_only=False)
+
+    def _handle_request(self, head_only: bool):
         parsed = urlparse(self.path)
         path = parsed.path
         if path in ['/', '/index.html']:
-            return self._html(render_index_html())
+            return self._html(render_index_html(), include_body=not head_only)
+        if path == '/favicon.ico':
+            self.send_response(204)
+            self.end_headers()
+            return
         if path == '/api/health':
-            return self._json({'status': 'ok', 'version': APP_VERSION, 'name': APP_NAME})
+            return self._json({'status': 'ok', 'version': APP_VERSION, 'name': APP_NAME}, include_body=not head_only)
         if path == '/api/library':
             tracks = scan_tracks()
             playlists = [{'name': k, 'tracks': v, 'count': len(v)} for k, v in read_playlists().items()]
-            return self._json({'tracks': tracks, 'playlists': playlists, 'artist_playlists': auto_artist_playlists(tracks), 'folders': folders_tree(tracks), 'name': APP_NAME, 'version': APP_VERSION})
+            return self._json({'tracks': tracks, 'playlists': playlists, 'artist_playlists': auto_artist_playlists(tracks), 'folders': folders_tree(tracks), 'name': APP_NAME, 'version': APP_VERSION}, include_body=not head_only)
         if path.startswith('/api/stream/'):
             rel = unquote(path[len('/api/stream/'):])
-            target = (MUSIC_ROOT / rel).resolve()
-            if not target.exists() or not target.is_file() or (MUSIC_ROOT != target and MUSIC_ROOT not in target.parents):
-                return self._json({'error': 'not found'}, 404)
-            ctype = mimetypes.guess_type(target.name)[0] or 'application/octet-stream'
+            target = resolve_target(rel)
+            if target is None:
+                return self._json({'error': 'not found'}, 404, include_body=not head_only)
             size = target.stat().st_size
             rng = self.headers.get('Range')
+            start = end = None
             if rng and rng.startswith('bytes='):
                 spec = rng.split('=', 1)[1]
                 first, _, last = spec.partition('-')
                 start = int(first) if first else 0
                 end = int(last) if last else size - 1
-                end = min(end, size - 1)
-                if start > end:
-                    start, end = 0, size - 1
-                length = end - start + 1
-                self.send_response(206)
-                self.send_header('Content-Type', ctype)
-                self.send_header('Accept-Ranges', 'bytes')
-                self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
-                self.send_header('Content-Length', str(length))
-                self.end_headers()
-                with target.open('rb') as f:
-                    f.seek(start)
-                    self.wfile.write(f.read(length))
+            offset, length = self._send_stream_headers(target, start, end, head_only=head_only)
+            if head_only:
                 return
-            self.send_response(200)
-            self.send_header('Content-Type', ctype)
-            self.send_header('Content-Length', str(size))
-            self.send_header('Accept-Ranges', 'bytes')
-            self.end_headers()
-            with target.open('rb') as f:
-                while True:
-                    chunk = f.read(262144)
-                    if not chunk:
-                        break
-                    self.wfile.write(chunk)
+            try:
+                with target.open('rb') as f:
+                    f.seek(offset)
+                    remaining = length
+                    while remaining > 0:
+                        chunk = f.read(min(262144, remaining))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        remaining -= len(chunk)
+            except (BrokenPipeError, ConnectionResetError):
+                return
             return
-        return self._json({'error': 'not found'}, 404)
+        return self._json({'error': 'not found'}, 404, include_body=not head_only)
 
     def do_POST(self):
         parsed = urlparse(self.path)

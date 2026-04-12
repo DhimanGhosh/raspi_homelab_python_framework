@@ -84,7 +84,7 @@ class PluginRuntime:
 
         if runtime_type == "docker":
             compose_dir = plugin_dir / "docker"
-            result = self.runner.run(["docker", "compose", "up", "-d"], cwd=compose_dir)
+            result = self.runner.run(["docker", "compose", "-p", plugin_id, "up", "-d", "--remove-orphans"], cwd=compose_dir)
             public_url = self._maybe_apply_public_route(plugin_id)
             self.state_store.update_plugin_state(plugin_id, {
                 "status": "running",
@@ -151,7 +151,7 @@ class PluginRuntime:
 
         if runtime_type == "docker":
             compose_dir = plugin_dir / "docker"
-            result = self.runner.run(["docker", "compose", "down"], cwd=compose_dir)
+            result = self.runner.run(["docker", "compose", "-p", plugin_id, "down", "--remove-orphans"], cwd=compose_dir)
             self.state_store.update_plugin_state(plugin_id, {
                 "status": "stopped",
                 "last_action": "stop",

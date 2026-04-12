@@ -63,8 +63,8 @@ class ReverseProxyService:
         if plugin_id == "control-center":
             suffix = "/"
         else:
-            app = self.catalog.get_app(plugin_id) or {}
-            suffix = str(app.get("entrypoint_path") or "/")
+            app = self.catalog.get_app(plugin_id)
+            suffix = app.get("entrypoint_path", "/") if app else "/"
         return self._build_public_url(port, suffix)
 
     def _snippet_tls_block(self) -> str:

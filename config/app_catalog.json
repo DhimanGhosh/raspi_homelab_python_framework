@@ -54,12 +54,6 @@
       "entrypoint_path": "/",
       "_comment": "App for playing music, can be used with Link Downloader for a complete music management solution"
     },
-    "navidrome": {
-      "name": "Navidrome",
-      "public_port": 8445,
-      "entrypoint_path": "/",
-      "_comment": "Deprecated, use music-player instead"
-    },
     "nextcloud": {
       "name": "Nextcloud",
       "public_port": 8448,
@@ -89,6 +83,12 @@
       "public_port": 8452,
       "entrypoint_path": "/",
       "_comment": "Voice assistant app powered by a local LLM, can be used for controlling other apps in your homelab with voice commands, setting reminders, and more"
+    },
+    "song-downloader": {
+      "name": "Song Downloader",
+      "public_port": 8445,
+      "entrypoint_path": "/",
+      "_comment": "Downloads full-audio songs by query, can auto-rename, and can auto-transfer into /mnt/nas/media/music. It may use the Media Downloader API when available, with direct yt-dlp fallback."
     }
   },
   "core_stack": [

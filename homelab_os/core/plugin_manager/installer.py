@@ -106,7 +106,7 @@ class PluginInstaller:
 
         compose_dir = plugin_dir / "docker"
         if compose_dir.exists() and (compose_dir / "docker-compose.yml").exists():
-            self.runner.run(["docker", "compose", "down", "--remove-orphans", "-v"], cwd=compose_dir, check=False)
+            self.runner.run(["docker", "compose", "-p", plugin_id, "down", "--remove-orphans", "-v"], cwd=compose_dir, check=False)
 
         self.runner.run(["docker", "rm", "-f", plugin_id], check=False)
         self.proxy.remove_plugin_route(plugin_id)
