@@ -9,10 +9,8 @@ services:
       APP_VERSION: 1.3.0
       TAILSCALE_FQDN: ${TAILSCALE_FQDN:-pi-nas.taild4713b.ts.net}
       NAS_PATH: /mnt/nas
-      APP_BASE: /mnt/nas/homelab/apps
+      CONTROL_CENTER_SUMMARY_URL: ${CONTROL_CENTER_SUMMARY_URL:-http://127.0.0.1:9000/api/control-center/summary}
     volumes:
       - /mnt/nas:/mnt/nas
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/hostname:/etc/hostname:ro
       - /etc/localtime:/etc/localtime:ro
-      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock:ro

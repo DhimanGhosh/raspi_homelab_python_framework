@@ -18,33 +18,13 @@ ARTIST_SPLIT_RE = re.compile(r"\s*(?:,|/|&| feat\.? | ft\.? | featuring )\s*", r
 IGNORE_ARTISTS = {"chorus", "others", "other", "music"}
 APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+ROOT = Path(__file__).resolve().parent
+TEMPLATES_DIR = ROOT / 'templates'
+STATIC_DIR = ROOT / 'static'
+
 
 def render_index_html() -> str:
-    template = (TEMPLATES_DIR / "index.html").read_text(encoding="utf-8")
-    return (
-        template
-        .replace("{{APP_NAME}}", APP_NAME)
-        .replace("{{APP_NAME_JSON}}", json.dumps(APP_NAME))
-        .replace("{{APP_VERSION_JSON}}", json.dumps(APP_VERSION))
-    )
-
-
-def serve_static_asset(handler: "Handler", relative_path: str) -> bool:
-    asset = (STATIC_DIR / relative_path).resolve()
-    if not asset.exists() or not asset.is_file() or (STATIC_DIR.resolve() != asset and STATIC_DIR.resolve() not in asset.parents):
-        return False
-    content_type = mimetypes.guess_type(asset.name)[0] or "application/octet-stream"
-    data = asset.read_bytes()
-    handler.send_response(200)
-    handler.send_header("Content-Type", content_type)
-    handler.send_header("Content-Length", str(len(data)))
-    handler.end_headers()
-    handler.wfile.write(data)
-    return True
-
-TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-STATIC_DIR = Path(__file__).resolve().parent / "static"
-
+    return (TEMPLATES_DIR / 'index.html').read_text(encoding='utf-8')
 
 
 def normalize_spaces(text: str) -> str:
@@ -146,11 +126,6 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         if path in ['/', '/index.html']:
             return self._html(render_index_html())
-        if path.startswith('/static/'):
-            relative_path = path[len('/static/'):].lstrip('/')
-            if serve_static_asset(self, relative_path):
-                return
-            return self._json({'error': 'not found'}, 404)
         if path == '/api/health':
             return self._json({'status': 'ok', 'version': APP_VERSION, 'name': APP_NAME})
         if path == '/api/library':

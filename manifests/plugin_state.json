@@ -38,21 +38,21 @@
       "stderr": "time=\"2026-04-12T16:17:41+05:30\" level=warning msg=\"Found orphan containers ([music-player]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.\"\n Container personal-library  Creating\n Container personal-library  Created\n Container personal-library  Starting\n Container personal-library  Started\n",
       "public_url": "https://pi-nas.taild4713b.ts.net:8454/"
     },
-    "link-downloader": {
-      "status": "running",
-      "runtime_type": "docker",
-      "last_action": "start",
-      "stdout": "",
-      "stderr": "time=\"2026-04-12T16:17:51+05:30\" level=warning msg=\"Found orphan containers ([personal-library music-player]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.\"\n Container link-downloader  Creating\n Container link-downloader  Created\n Container link-downloader  Starting\n Container link-downloader  Started\n",
-      "public_url": "https://pi-nas.taild4713b.ts.net:8460/"
-    },
     "music-player": {
       "status": "running",
       "runtime_type": "docker",
       "last_action": "start",
       "stdout": "",
-      "stderr": " Network docker_default  Creating\n Network docker_default  Created\n Container music-player  Creating\n Container music-player  Created\n Container music-player  Starting\n Container music-player  Started\n",
-      "public_url": null
+      "stderr": "time=\"2026-04-12T18:03:47+05:30\" level=warning msg=\"Found orphan containers ([link-downloader]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.\"\n Container music-player  Creating\n Container music-player  Created\n Container music-player  Starting\n Container music-player  Started\n",
+      "public_url": "https://pi-nas.taild4713b.ts.net:8459/"
+    },
+    "link-downloader": {
+      "status": "running",
+      "runtime_type": "docker",
+      "last_action": "start",
+      "stdout": "",
+      "stderr": " Network docker_default  Creating\n Network docker_default  Created\n Container link-downloader  Creating\n Container link-downloader  Created\n Container link-downloader  Starting\n Container link-downloader  Started\n",
+      "public_url": "https://pi-nas.taild4713b.ts.net:8460/"
     }
   }
 }

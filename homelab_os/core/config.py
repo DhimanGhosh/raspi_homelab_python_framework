@@ -88,7 +88,7 @@ def load_settings(env_file: str | Path | None = None) -> Settings:
         caddy_apps_dir=Path(os.getenv("CADDY_APPS_DIR", "/etc/caddy/apps")),
         caddy_disabled_dir=Path(os.getenv("CADDY_DISABLED_DIR", "/etc/caddy/apps.disabled")),
         tailscale_cert_dir=Path(os.getenv("TAILSCALE_CERT_DIR", "/etc/caddy/certs/tailscale")),
-        app_catalog_file=Path(os.getenv("APP_CATALOG_FILE", str(root / "config" / "app_catalog.json"))),
+        app_catalog_file=root / os.getenv("APP_CATALOG_FILE", "config/app_catalog.json"),
     )
 
 

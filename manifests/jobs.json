@@ -1,21 +1,37 @@
 {
   "jobs": {
-    "2cce3fdb-ed8d-4618-81e8-f71caa8ffa9b": {
-      "job_id": "2cce3fdb-ed8d-4618-81e8-f71caa8ffa9b",
-      "job_type": "start_plugin",
-      "target": "music-player",
+    "f4d8e47d-51d2-43b9-91fc-afb70c431f6a": {
+      "job_id": "f4d8e47d-51d2-43b9-91fc-afb70c431f6a",
+      "job_type": "install_plugin",
+      "target": "/home/pi/homelab_os/build/link-downloader.v1.0.9.tgz",
       "status": "completed",
       "progress": 100,
-      "created_at": "2026-04-12T16:45:45",
-      "updated_at": "2026-04-12T16:45:48",
+      "created_at": "2026-04-12T18:06:00",
+      "updated_at": "2026-04-12T18:06:16",
       "metadata": {
-        "plugin_id": "music-player"
+        "archive": "/home/pi/homelab_os/build/link-downloader.v1.0.9.tgz",
+        "app_id": "link-downloader",
+        "auto_start": true
       },
       "result": {
-        "plugin_id": "music-player",
-        "runtime_type": "docker",
-        "status": "running",
-        "public_url": null
+        "id": "link-downloader",
+        "name": "Media Downloader",
+        "version": "1.0.9",
+        "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/link-downloader",
+        "network": {
+          "internal_port": 8160
+        },
+        "entrypoint": {
+          "type": "web",
+          "path": "/"
+        },
+        "public_url": "https://pi-nas.taild4713b.ts.net:8460/",
+        "start_result": {
+          "plugin_id": "link-downloader",
+          "runtime_type": "docker",
+          "status": "running",
+          "public_url": "https://pi-nas.taild4713b.ts.net:8460/"
+        }
       }
     }
   }
