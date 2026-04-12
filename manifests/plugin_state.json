@@ -22,29 +22,21 @@
         "error": "<urlopen error [Errno -2] Name or service not known>"
       }
     },
-    "api-gateway": {
-      "last_healthcheck": {
-        "ok": false,
-        "status_code": null,
-        "url": "https://pi-nas.taild4713b.ts.net:8456/docs",
-        "error": "<urlopen error [Errno -2] Name or service not known>"
-      }
+    "music-player": {
+      "status": "running",
+      "runtime_type": "docker",
+      "last_action": "start",
+      "stdout": "",
+      "stderr": "time=\"2026-04-12T18:44:57+05:30\" level=warning msg=\"Found orphan containers ([link-downloader]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.\"\n Container music-player  Creating\n Container music-player  Created\n Container music-player  Starting\n Container music-player  Started\n",
+      "public_url": "https://pi-nas.taild4713b.ts.net:8459/"
     },
     "personal-library": {
       "status": "running",
       "runtime_type": "docker",
       "last_action": "start",
       "stdout": "",
-      "stderr": "time=\"2026-04-12T16:17:41+05:30\" level=warning msg=\"Found orphan containers ([music-player]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.\"\n Container personal-library  Creating\n Container personal-library  Created\n Container personal-library  Starting\n Container personal-library  Started\n",
+      "stderr": "time=\"2026-04-12T18:44:59+05:30\" level=warning msg=\"Found orphan containers ([music-player link-downloader]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.\"\n Container personal-library  Creating\n Container personal-library  Created\n Container personal-library  Starting\n Container personal-library  Started\n",
       "public_url": "https://pi-nas.taild4713b.ts.net:8454/"
-    },
-    "music-player": {
-      "status": "running",
-      "runtime_type": "docker",
-      "last_action": "start",
-      "stdout": "",
-      "stderr": "time=\"2026-04-12T18:03:47+05:30\" level=warning msg=\"Found orphan containers ([link-downloader]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.\"\n Container music-player  Creating\n Container music-player  Created\n Container music-player  Starting\n Container music-player  Started\n",
-      "public_url": "https://pi-nas.taild4713b.ts.net:8459/"
     },
     "link-downloader": {
       "status": "running",

@@ -5,15 +5,17 @@ import json
 import subprocess
 
 from homelab_os.core.config import Settings
-from homelab_os.core.services.app_catalog import AppCatalog, load_app_catalog
+from homelab_os.core.plugin_manager.registry import PluginRegistry
+from homelab_os.core.services.app_catalog import load_app_catalog
 from homelab_os.core.services.reverse_proxy import ReverseProxyService
 
 
 class NetworkStackService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.catalog: AppCatalog = load_app_catalog(str(settings.app_catalog_file))
+        self.catalog = load_app_catalog(str(settings.app_catalog_file))
         self.proxy = ReverseProxyService(settings)
+        self.registry = PluginRegistry(settings.manifests_dir / 'installed_plugins.json')
 
     def _run(self, cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(cmd, check=check, capture_output=True, text=True)
@@ -22,17 +24,22 @@ class NetworkStackService:
         return list(self.catalog.core_stack)
 
     def plugin_archive_path(self, plugin_name: str) -> Path:
+        versioned = sorted(self.settings.build_dir.glob(f'{plugin_name}.v*.tgz'), reverse=True)
+        if versioned:
+            return versioned[0]
         return self.settings.build_dir / f'{plugin_name}.tgz'
 
     def installed_plugin_dir(self, plugin_id: str) -> Path:
         return self.settings.runtime_installed_plugins_dir / plugin_id
 
-    def plugin_internal_port(self, plugin_id: str) -> int | None:
+    def read_runtime_metadata(self, plugin_id: str) -> dict:
         runtime_json = self.installed_plugin_dir(plugin_id) / 'runtime.json'
         if not runtime_json.exists():
-            return None
-        payload = json.loads(runtime_json.read_text(encoding='utf-8'))
-        return payload.get('network', {}).get('internal_port')
+            return {}
+        return json.loads(runtime_json.read_text(encoding='utf-8'))
+
+    def plugin_internal_port(self, plugin_id: str) -> int | None:
+        return self.read_runtime_metadata(plugin_id).get('network', {}).get('internal_port')
 
     def ensure_core_route(self) -> str:
         return self.proxy.apply_core_route()
@@ -41,7 +48,7 @@ class NetworkStackService:
         internal_port = self.plugin_internal_port(plugin_id)
         if not internal_port:
             return None
-        return self.proxy.apply_plugin_route(plugin_id, internal_port)
+        return self.proxy.apply_plugin_route(plugin_id, int(internal_port))
 
     def tailscale_status(self) -> str:
         result = self._run(['tailscale', 'status'], check=False)
@@ -51,11 +58,28 @@ class NetworkStackService:
         result = self._run(['tailscale', 'ip', '-4'], check=False)
         return (result.stdout or '').strip()
 
-    def reconcile_routes(self, plugin_ids: list[str] | None = None) -> dict:
-        applied = {}
-        ids = plugin_ids if plugin_ids is not None else self.core_stack()
+    def _persist_public_url(self, plugin_id: str, public_url: str | None) -> None:
+        if not public_url:
+            return
+        entry = self.registry.get_plugin(plugin_id)
+        if entry:
+            entry['public_url'] = public_url
+            self.registry.upsert_plugin(entry)
+        runtime_metadata = self.read_runtime_metadata(plugin_id)
+        if runtime_metadata:
+            runtime_metadata['public_url'] = public_url
+            runtime_json = self.installed_plugin_dir(plugin_id) / 'runtime.json'
+            runtime_json.write_text(json.dumps(runtime_metadata, indent=2), encoding='utf-8')
+
+    def reconcile_routes(self, plugin_ids: list[str] | None = None, include_core: bool = True) -> dict:
+        applied: dict[str, str] = {}
+        if include_core:
+            applied['control-center'] = self.ensure_core_route()
+        installed_ids = sorted(self.registry.list_all().keys())
+        ids = plugin_ids if plugin_ids is not None else installed_ids
         for plugin_id in ids:
-            url = self.ensure_plugin_route(plugin_id)
-            if url:
-                applied[plugin_id] = url
+            public_url = self.ensure_plugin_route(plugin_id)
+            if public_url:
+                self._persist_public_url(plugin_id, public_url)
+                applied[plugin_id] = public_url
         return applied

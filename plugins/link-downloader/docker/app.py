@@ -112,6 +112,28 @@ def clear_finished_jobs():
         return len(remove_ids)
 
 
+def clear_saved_files() -> dict:
+    removed_files = 0
+    removed_dirs = 0
+    for root in [DOWNLOAD_ROOT, CONVERTED_ROOT, UPLOAD_ROOT]:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob('*'), key=lambda p: len(p.parts), reverse=True):
+            try:
+                if path.is_file() or path.is_symlink():
+                    path.unlink(missing_ok=True)
+                    removed_files += 1
+                elif path.is_dir():
+                    path.rmdir()
+                    removed_dirs += 1
+            except FileNotFoundError:
+                continue
+            except OSError:
+                continue
+        root.mkdir(parents=True, exist_ok=True)
+    return {'removed_files': removed_files, 'removed_dirs': removed_dirs}
+
+
 def safe_name(text: str) -> str:
     text = re.sub(r'[^A-Za-z0-9._ -]+', '_', str(text)).strip().strip('.')
     text = re.sub(r'\s+', '_', text)
@@ -554,6 +576,11 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == '/api/clear-jobs':
             removed = clear_finished_jobs()
             json_response(self, {'ok': True, 'removed': removed})
+            return
+        if parsed.path == '/api/clear-clutter':
+            removed_jobs = clear_finished_jobs()
+            removed_files = clear_saved_files()
+            json_response(self, {'ok': True, 'removed_jobs': removed_jobs, **removed_files})
             return
         if parsed.path == '/api/upload-convert':
             form = parse_multipart(self)

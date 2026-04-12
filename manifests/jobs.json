@@ -1,13 +1,13 @@
 {
   "jobs": {
-    "f4d8e47d-51d2-43b9-91fc-afb70c431f6a": {
-      "job_id": "f4d8e47d-51d2-43b9-91fc-afb70c431f6a",
+    "095ce62b-3a8f-4cd6-9f3b-e951c11c5b36": {
+      "job_id": "095ce62b-3a8f-4cd6-9f3b-e951c11c5b36",
       "job_type": "install_plugin",
       "target": "/home/pi/homelab_os/build/link-downloader.v1.0.9.tgz",
       "status": "completed",
       "progress": 100,
-      "created_at": "2026-04-12T18:06:00",
-      "updated_at": "2026-04-12T18:06:16",
+      "created_at": "2026-04-12T18:57:34",
+      "updated_at": "2026-04-12T18:58:08",
       "metadata": {
         "archive": "/home/pi/homelab_os/build/link-downloader.v1.0.9.tgz",
         "app_id": "link-downloader",

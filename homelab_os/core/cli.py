@@ -10,6 +10,7 @@ from homelab_os.core.plugin_manager import PluginBuilder, PluginInstaller
 from homelab_os.core.plugin_manager.runtime import PluginRuntime
 from homelab_os.core.services.jobs import JobStore
 from homelab_os.core.services.logging_service import LoggingService
+from homelab_os.core.services.network_stack import NetworkStackService
 from homelab_os.core.services.reverse_proxy import ReverseProxyService
 from homelab_os.core.services.systemd_service import CoreServiceManager
 
@@ -34,6 +35,8 @@ def _plugin_version(source_dir: Path) -> str:
 def bootstrap_host(env_file: str = '.env') -> None:
     settings = load_settings(env_file)
     ensure_runtime_dirs(settings)
+    stack = NetworkStackService(settings)
+    applied = stack.reconcile_routes(include_core=True)
     typer.echo('Host bootstrap completed.')
     typer.echo('')
     typer.echo('Resolved settings:')
@@ -46,6 +49,10 @@ def bootstrap_host(env_file: str = '.env') -> None:
     typer.echo(f'  Build dir          : {settings.build_dir}')
     typer.echo(f'  Plugins dir        : {settings.plugins_dir}')
     typer.echo(f'  Runtime dir        : {settings.runtime_dir}')
+    typer.echo('')
+    typer.echo(f'Rebound routes      : {len(applied)}')
+    for plugin_id, public_url in applied.items():
+        typer.echo(f'  {plugin_id:<18} -> {public_url}')
 
 
 @app.command('show-settings')
@@ -54,6 +61,16 @@ def show_settings(env_file: str = '.env') -> None:
     ensure_runtime_dirs(settings)
     for key, value in asdict(settings).items():
         typer.echo(f'{key}: {value}')
+
+@app.command('reconcile-routes')
+def reconcile_routes(env_file: str = '.env') -> None:
+    settings = load_settings(env_file)
+    ensure_runtime_dirs(settings)
+    stack = NetworkStackService(settings)
+    applied = stack.reconcile_routes(include_core=True)
+    typer.echo(f'Rebound {len(applied)} routes')
+    for plugin_id, public_url in applied.items():
+        typer.echo(f'{plugin_id}: {public_url}')
 
 
 @app.command('build-all-plugins')
