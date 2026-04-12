@@ -12,27 +12,11 @@ from homelab_os.core.plugin_manager.registry import PluginRegistry
 from homelab_os.core.plugin_manager.runtime import PluginRuntime
 from homelab_os.core.services.jobs import JobStore
 from homelab_os.core.services.logging_service import LoggingService
+from homelab_os.core.services.app_catalog import app_meta_map, public_url_for_app
 from homelab_os.core.services.reverse_proxy import ReverseProxyService
 
 router = APIRouter()
 
-APP_META = {
-    "control-center": {"name": "Control Center", "port": 8444},
-    "api-gateway": {"name": "API Gateway", "port": 8456},
-    "dictionary": {"name": "Dictionary", "port": 8455},
-    "files": {"name": "Files", "port": 8449},
-    "homarr": {"name": "Homarr", "port": 8453},
-    "home-assistant": {"name": "Home Assistant", "port": 8450},  # Deprecated, will be removed in favor of status and voice-ai
-    "jellyfin": {"name": "Jellyfin", "port": 8446},  # Deprecated, will be removed in favor of media-dashboard
-    "link-downloader": {"name": "Media Downloader", "port": 8460},
-    "music-player": {"name": "Music Player", "port": 8459},
-    "navidrome": {"name": "Navidrome", "port": 8445},  # Deprecated, will be removed in favor of music-player
-    "nextcloud": {"name": "Nextcloud", "port": 8448},  # Deprecated, will be removed in favor of files
-    "personal-library": {"name": "Personal Library", "port": 8454},
-    "pihole": {"name": "Pi-hole", "port": 8447},
-    "status": {"name": "Pi Status Board", "port": 8451},
-    "voice-ai": {"name": "Pi Voice AI", "port": 8452},
-}
 
 def _gb(value: int) -> float:
     return round(value / (1024 ** 3), 2)
@@ -87,15 +71,14 @@ def _catalog_with_runtime():
         state_payload = json.loads(state_file.read_text(encoding="utf-8")).get("plugins", {})
 
     visible_ids = set(installed.keys()) | set(bundle_groups.keys()) | {"control-center"}
+    app_catalog = app_meta_map(settings)
     catalog = []
     for app_id in sorted(visible_ids):
-        meta = APP_META.get(app_id, {"name": app_id.replace("-", " ").title(), "port": None})
+        meta = app_catalog.get(app_id, {"name": app_id.replace("-", " ").title(), "entrypoint_path": "/"})
         installed_meta = installed.get(app_id)
         plugin_state = state_payload.get(app_id, {})
-        public_url = None
-        if app_id == "control-center":
-            public_url = f"https://{settings.tailscale_fqdn}:{settings.control_center_public_port}"
-        elif installed_meta:
+        public_url = public_url_for_app(settings, app_id)
+        if installed_meta and installed_meta.get("public_url"):
             public_url = installed_meta.get("public_url")
 
         catalog.append({
@@ -105,7 +88,7 @@ def _catalog_with_runtime():
             "installed_version": installed_meta.get("version") if installed_meta else None,
             "installed": installed_meta is not None or app_id == "control-center",
             "public_url": public_url,
-            "port": meta["port"],
+            "port": meta.get("public_port"),
             "bundles": bundle_groups.get(app_id, []),
             "bundle_count": len(bundle_groups.get(app_id, [])),
             "status": plugin_state.get("status", "running" if app_id == "control-center" else ("stopped" if installed_meta else "not-installed")),

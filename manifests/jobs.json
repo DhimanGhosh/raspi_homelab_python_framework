@@ -1,3 +1,22 @@
 {
-  "jobs": {}
+  "jobs": {
+    "2cce3fdb-ed8d-4618-81e8-f71caa8ffa9b": {
+      "job_id": "2cce3fdb-ed8d-4618-81e8-f71caa8ffa9b",
+      "job_type": "start_plugin",
+      "target": "music-player",
+      "status": "completed",
+      "progress": 100,
+      "created_at": "2026-04-12T16:45:45",
+      "updated_at": "2026-04-12T16:45:48",
+      "metadata": {
+        "plugin_id": "music-player"
+      },
+      "result": {
+        "plugin_id": "music-player",
+        "runtime_type": "docker",
+        "status": "running",
+        "public_url": null
+      }
+    }
+  }
 }

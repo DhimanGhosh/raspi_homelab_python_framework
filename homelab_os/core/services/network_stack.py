@@ -4,26 +4,16 @@ from pathlib import Path
 import subprocess
 
 from homelab_os.core.config import Settings
+from homelab_os.core.services.app_catalog import core_stack
 from homelab_os.core.services.reverse_proxy import ReverseProxyService
 
 
 class NetworkStackService:
-    DEFAULT_STACK = [
-        "pihole",
-        "files",
-        "status",
-        "voice-ai",
-        "homarr",
-        "personal-library",
-        "dictionary",
-        "api-gateway",
-        "music-player",
-        "link-downloader",
-    ]
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.proxy = ReverseProxyService(settings)
+        self.default_stack = core_stack(settings)
 
     def _run(self, cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(cmd, check=check, capture_output=True, text=True)

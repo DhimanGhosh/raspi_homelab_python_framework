@@ -5,35 +5,7 @@ import tempfile
 from pathlib import Path
 
 from homelab_os.core.config import Settings
-
-
-PLUGIN_PORT_MAP = {
-    "control-center": 8444,
-    "pihole": 8447,
-    "files": 8449,
-    "status": 8451,
-    "voice-ai": 8452,
-    "homarr": 8453,
-    "personal-library": 8454,
-    "dictionary": 8455,
-    "api-gateway": 8456,
-    "music-player": 8459,
-    "link-downloader": 8460,
-}
-
-PLUGIN_PATH_SUFFIX = {
-    "control-center": "",
-    "pihole": "/admin/",
-    "files": "",
-    "status": "",
-    "voice-ai": "/",
-    "homarr": "/",
-    "personal-library": "/",
-    "dictionary": "/",
-    "api-gateway": "/docs",
-    "music-player": "/",
-    "link-downloader": "/",
-}
+from homelab_os.core.services.app_catalog import public_port_for_app, public_url_for_app
 
 
 class ReverseProxyService:
@@ -61,19 +33,16 @@ class ReverseProxyService:
         return result.stdout
 
     def has_public_route(self, plugin_id: str) -> bool:
-        return plugin_id in PLUGIN_PORT_MAP
+        return public_port_for_app(self.settings, plugin_id) is not None
 
     def public_port_for_plugin(self, plugin_id: str) -> int:
-        if plugin_id not in PLUGIN_PORT_MAP:
+        port = public_port_for_app(self.settings, plugin_id)
+        if port is None:
             raise KeyError(f"No public port mapping defined for plugin '{plugin_id}'")
-        return PLUGIN_PORT_MAP[plugin_id]
+        return port
 
     def public_url_for_plugin(self, plugin_id: str) -> str | None:
-        if not self.has_public_route(plugin_id):
-            return None
-        port = self.public_port_for_plugin(plugin_id)
-        suffix = PLUGIN_PATH_SUFFIX.get(plugin_id, "")
-        return f"https://{self.settings.tailscale_fqdn}:{port}{suffix}"
+        return public_url_for_app(self.settings, plugin_id)
 
     def _snippet_tls_block(self) -> str:
         cert = self.settings.tailscale_cert_dir / f"{self.settings.tailscale_fqdn}.crt"
