@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, unquote
 
-APP_VERSION = os.getenv("APP_VERSION", "7.1.6")
+APP_VERSION = os.getenv("APP_VERSION", "7.2.0")
 APP_NAME = os.getenv("APP_NAME", "Music Player")
 MUSIC_ROOT = Path(os.getenv("MUSIC_ROOT", "/mnt/nas/media/music")).resolve()
 APP_DATA_DIR = Path(os.getenv("APP_DATA_DIR", "/mnt/nas/homelab/runtime/music-player/data")).resolve()
@@ -124,7 +124,6 @@ def library_payload() -> dict:
                 artist_map.setdefault(artist.strip(), []).append(track["id"])
         else:
             artist_map.setdefault("Unknown Artist", []).append(track["id"])
-
         folder_name = track["folder"] or "Root"
         folder_map.setdefault(folder_name, []).append(track["id"])
 
@@ -233,7 +232,6 @@ class Handler(BaseHTTPRequestHandler):
         target = (STATIC_DIR / rel).resolve()
         if not target.exists() or not target.is_file() or STATIC_DIR not in target.parents:
             return self._json({"error": "not found"}, 404, include_body=not head_only)
-
         ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         data = target.read_bytes()
         self.send_response(200)
@@ -249,18 +247,14 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ["/", "/index.html"]:
             return self._text(read_text(TEMPLATES_DIR / "index.html"), ctype="text/html; charset=utf-8", include_body=not head_only)
-
         if path.startswith("/static/"):
             return self._serve_static(path[len("/static/"):], head_only=head_only)
-
         if path == "/favicon.ico":
             self.send_response(204)
             self.end_headers()
             return
-
         if path == "/api/health":
             return self._json({"status": "ok", "version": APP_VERSION, "name": APP_NAME}, include_body=not head_only)
-
         if path == "/api/library":
             return self._json(library_payload(), include_body=not head_only)
 
@@ -269,20 +263,17 @@ class Handler(BaseHTTPRequestHandler):
             target = resolve_target(rel)
             if target is None:
                 return self._json({"error": "not found"}, 404, include_body=not head_only)
-
             size = target.stat().st_size
             ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
             range_header = self.headers.get("Range")
             start, end = 0, size - 1
             status = 200
-
             if range_header and range_header.startswith("bytes="):
                 spec = range_header.split("=", 1)[1]
                 first, _, last = spec.partition("-")
                 start = int(first) if first else 0
                 end = int(last) if last else size - 1
                 status = 206
-
             length = end - start + 1
             self.send_response(status)
             self.send_header("Content-Type", ctype)
@@ -291,10 +282,8 @@ class Handler(BaseHTTPRequestHandler):
             if status == 206:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
             self.end_headers()
-
             if head_only:
                 return
-
             try:
                 with target.open("rb") as handle:
                     handle.seek(start)
@@ -327,6 +316,29 @@ class Handler(BaseHTTPRequestHandler):
             data[name] = list(dict.fromkeys(existing + track_ids))
             write_playlists(data)
             return self._json({"ok": True, "name": name, "count": len(data[name])})
+
+        if parsed.path == "/api/playlists/rename":
+            old_name = normalize_spaces(str(payload.get("old_name", "")))
+            new_name = normalize_spaces(str(payload.get("new_name", "")))
+            if not old_name or not new_name:
+                return self._json({"error": "old and new playlist names required"}, 400)
+            data = read_playlists()
+            if old_name not in data:
+                return self._json({"error": "playlist not found"}, 404)
+            tracks = data.pop(old_name)
+            existing = data.get(new_name, [])
+            data[new_name] = list(dict.fromkeys(existing + tracks))
+            write_playlists(data)
+            return self._json({"ok": True, "name": new_name})
+
+        if parsed.path == "/api/playlists/delete":
+            name = normalize_spaces(str(payload.get("name", "")))
+            if not name:
+                return self._json({"error": "playlist name required"}, 400)
+            data = read_playlists()
+            data.pop(name, None)
+            write_playlists(data)
+            return self._json({"ok": True})
 
         if parsed.path == "/api/folders/create":
             name = normalize_spaces(str(payload.get("name", ""))).strip("/\\")

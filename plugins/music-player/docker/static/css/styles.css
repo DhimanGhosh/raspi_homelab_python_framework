@@ -25,10 +25,21 @@ button {
   cursor: pointer;
 }
 
+.hidden {
+  display: none !important;
+}
+
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 8, 20, 0.72);
+  z-index: 900;
+}
+
 .app-shell {
   min-height: 0;
   display: grid;
-  grid-template-columns: 150px 1fr;
+  grid-template-columns: 170px 1fr;
 }
 
 .sidebar {
@@ -36,6 +47,17 @@ button {
   padding: 10px 8px;
   background: #121a2b;
   border-right: 1px solid #263149;
+}
+
+.brand-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-close {
+  display: none;
 }
 
 .brand-title {
@@ -73,7 +95,8 @@ button {
 .ghost-btn:hover,
 .icon-btn:hover,
 .track-mini-btn:hover,
-.playlist-chip:hover {
+.playlist-chip:hover,
+.manage-btn:hover {
   background: #223252;
 }
 
@@ -120,6 +143,17 @@ button {
   gap: 8px;
 }
 
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.menu-toggle {
+  display: none;
+}
+
 .search-input {
   width: 100%;
   min-width: 0;
@@ -146,7 +180,9 @@ button {
 .icon-btn,
 .primary-btn,
 .track-mini-btn,
-.playlist-chip {
+.playlist-chip,
+.manage-btn,
+.danger-btn {
   border-radius: 14px;
   padding: 10px 14px;
   color: #eef2ff;
@@ -163,6 +199,12 @@ button {
 
 .primary-btn:hover {
   background: #93a7ff;
+}
+
+.danger-btn {
+  background: #7f1d1d;
+  border-color: #a33;
+  color: #fff;
 }
 
 .selection-bar {
@@ -225,6 +267,7 @@ button {
   border-radius: 16px;
   background: #131d31;
   border: 1px solid #24324c;
+  min-height: 0;
 }
 
 .track-row.active {
@@ -277,11 +320,6 @@ button {
   height: auto;
 }
 
-.item-chip {
-  width: 220px;
-  text-align: left;
-}
-
 .item-card-title {
   font-weight: 800;
   color: #f8fbff;
@@ -291,6 +329,12 @@ button {
   margin-top: 6px;
   color: #aab6d1;
   font-size: 0.9rem;
+}
+
+.item-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .note-box {
@@ -404,6 +448,39 @@ button {
 
 @media (max-width: 900px) {
   .app-shell {
-    grid-template-columns: 150px 1fr;
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 250px;
+    height: 100%;
+    z-index: 1001;
+    transition: left 0.25s ease;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .sidebar-close,
+  .menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-actions {
+    justify-content: flex-end;
+  }
+
+  .player-bar {
+    grid-template-columns: 1fr;
   }
 }

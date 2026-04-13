@@ -143,7 +143,7 @@
     "music-player": {
       "id": "music-player",
       "name": "Music Player",
-      "version": "7.1.6",
+      "version": "7.2.0",
       "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/music-player",
       "network": {
         "internal_port": 8140,

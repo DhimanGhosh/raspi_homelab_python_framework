@@ -7,11 +7,18 @@
   <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
 <body>
+  <div id="mobileOverlay" class="mobile-overlay hidden"></div>
+
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside id="sidebar" class="sidebar">
       <div class="brand-block">
-        <div class="brand-title">Music Player</div>
-        <div class="brand-version">v7.1.6</div>
+        <div class="brand-header">
+          <div>
+            <div class="brand-title">Music Player</div>
+            <div class="brand-version">v7.2.0</div>
+          </div>
+          <button id="closeSidebarBtn" class="icon-btn sidebar-close">✕</button>
+        </div>
       </div>
 
       <nav class="sidebar-nav">
@@ -29,7 +36,10 @@
 
     <main class="main-panel">
       <header class="topbar">
-        <input id="searchInput" class="search-input" placeholder="Search songs, artists, folders" />
+        <div class="topbar-left">
+          <button id="menuToggle" class="icon-btn menu-toggle">☰</button>
+          <input id="searchInput" class="search-input" placeholder="Search songs, artists, folders" />
+        </div>
         <div class="topbar-actions">
           <button id="shuffleAllBtn" class="ghost-btn">Shuffle all</button>
           <button id="refreshBtn" class="ghost-btn">Refresh</button>
@@ -117,6 +127,25 @@
           <input id="newFolderName" class="search-input" placeholder="New folder name" />
           <button id="createFolderBtn" class="primary-btn">Create + add</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="managePlaylistModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close="manage-playlist"></div>
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3>Manage playlist</h3>
+        <button id="closeManagePlaylistModalBtn" class="close-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="muted-label">Rename playlist</div>
+        <div class="new-playlist-row">
+          <input id="renamePlaylistName" class="search-input" placeholder="New playlist name" />
+          <button id="renamePlaylistBtn" class="primary-btn">Rename</button>
+        </div>
+        <div class="muted-label">Delete playlist</div>
+        <button id="deletePlaylistBtn" class="danger-btn">Delete playlist</button>
       </div>
     </div>
   </div>
