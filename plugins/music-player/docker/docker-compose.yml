@@ -5,12 +5,12 @@ services:
     environment:
       PORT: "8140"
       APP_NAME: "Music Player"
-      APP_VERSION: "7.1.3"
+      APP_VERSION: "7.1.6"
       MUSIC_ROOT: "/mnt/nas/media/music"
       APP_DATA_DIR: "/mnt/nas/homelab/runtime/music-player/data"
     ports:
       - "127.0.0.1:8140:8140"
     volumes:
-      - /mnt/nas/media/music:/mnt/nas/media/music:ro
+      - /mnt/nas/media/music:/mnt/nas/media/music
       - /mnt/nas/homelab/runtime/music-player/data:/mnt/nas/homelab/runtime/music-player/data
     restart: unless-stopped
