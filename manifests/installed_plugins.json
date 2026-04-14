@@ -1,19 +1,5 @@
 {
   "plugins": {
-    "pihole": {
-      "id": "pihole",
-      "name": "Pi-hole",
-      "version": "1.0.0",
-      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/pihole",
-      "network": {
-        "internal_port": 8080
-      },
-      "entrypoint": {
-        "type": "web",
-        "path": "/admin/"
-      },
-      "public_url": "https://pi-nas.taild4713b.ts.net:8447/admin/"
-    },
     "api-gateway": {
       "id": "api-gateway",
       "name": "API Gateway",
@@ -112,19 +98,34 @@
       },
       "public_url": "https://pi-nas.taild4713b.ts.net:8454/"
     },
-    "song-downloader": {
-      "id": "song-downloader",
-      "name": "Song Downloader",
-      "version": "1.0.1",
-      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/song-downloader",
+    "music-player": {
+      "id": "music-player",
+      "name": "Music Player",
+      "version": "7.2.0",
+      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/music-player",
       "network": {
-        "internal_port": 8145
+        "internal_port": 8140,
+        "public_port": 8459
       },
       "entrypoint": {
         "type": "web",
         "path": "/"
       },
-      "public_url": "https://pi-nas.taild4713b.ts.net:8445/"
+      "public_url": "https://pi-nas.taild4713b.ts.net:8459/"
+    },
+    "pihole": {
+      "id": "pihole",
+      "name": "Pi-hole",
+      "version": "1.0.0",
+      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/pihole",
+      "network": {
+        "internal_port": 8080
+      },
+      "entrypoint": {
+        "type": "web",
+        "path": "/admin/"
+      },
+      "public_url": "https://pi-nas.taild4713b.ts.net:8447/admin/"
     },
     "link-downloader": {
       "id": "link-downloader",
@@ -140,20 +141,19 @@
       },
       "public_url": "https://pi-nas.taild4713b.ts.net:8460/"
     },
-    "music-player": {
-      "id": "music-player",
-      "name": "Music Player",
-      "version": "7.2.0",
-      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/music-player",
+    "song-downloader": {
+      "id": "song-downloader",
+      "name": "Song Downloader",
+      "version": "1.0.1",
+      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/song-downloader",
       "network": {
-        "internal_port": 8140,
-        "public_port": 8459
+        "internal_port": 8145
       },
       "entrypoint": {
         "type": "web",
         "path": "/"
       },
-      "public_url": "https://pi-nas.taild4713b.ts.net:8459/"
+      "public_url": "https://pi-nas.taild4713b.ts.net:8445/"
     }
   }
 }

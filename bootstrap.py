@@ -58,6 +58,8 @@ def ensure_env_file() -> None:
                 "CADDYFILE=/etc/caddy/Caddyfile",
                 "CADDY_APPS_DIR=/etc/caddy/apps",
                 "CADDY_DISABLED_DIR=/etc/caddy/apps.disabled",
+                "TAILSCALE_CERT_DIR=/etc/caddy/certs/tailscale",
+                "PIHOLE_PASSWORD=admin",
             ]
         )
         + "\n",
