@@ -1,422 +1,236 @@
+\
 from __future__ import annotations
 
 import json
 import os
 import re
 import shutil
+import subprocess
 import threading
-import time
 import uuid
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
-from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
-APP_NAME = os.environ.get('APP_NAME', 'Song Downloader')
-APP_VERSION = os.environ.get('APP_VERSION', '1.0.1')
-PORT = int(os.environ.get('PORT', '8145'))
-APP_DATA_DIR = Path(os.environ.get('APP_DATA_DIR', '/data'))
-DOWNLOAD_ROOT = Path(os.environ.get('DOWNLOAD_ROOT', str(APP_DATA_DIR / 'downloads')))
-DEFAULT_DESTINATION_DIR = os.environ.get('DEFAULT_DESTINATION_DIR', '/mnt/nas/media/music')
-MEDIA_DOWNLOADER_BASE_URL = os.environ.get('MEDIA_DOWNLOADER_BASE_URL', '').rstrip('/')
-ALLOWED_DEST_ROOTS = [Path(p) for p in os.environ.get('ALLOWED_DEST_ROOTS', '/mnt/nas:/data').split(':') if p]
-STATIC_DIR = Path(__file__).resolve().parent / 'static'
-HOST = '0.0.0.0'
-YOUTUBE_HOST_HINTS = ('youtube.com', 'youtu.be', 'music.youtube.com')
+from flask import Flask, jsonify, request, send_from_directory
 
-for path in [APP_DATA_DIR, DOWNLOAD_ROOT]:
-    path.mkdir(parents=True, exist_ok=True)
+APP_NAME = os.getenv("APP_NAME", "Song Downloader")
+APP_VERSION = os.getenv("APP_VERSION", "1.0.2")
+PORT = int(os.getenv("PORT", "8145"))
+MUSIC_ROOT = Path(os.getenv("MUSIC_ROOT", "/mnt/nas/media/music")).resolve()
+APP_DATA_DIR = Path(os.getenv("APP_DATA_DIR", "/mnt/nas/homelab/runtime/song-downloader/data")).resolve()
+DOWNLOADS_DIR = Path(os.getenv("DOWNLOADS_DIR", "/mnt/nas/homelab/runtime/song-downloader/downloads")).resolve()
+JOBS_FILE = APP_DATA_DIR / "jobs.json"
 
-JOBS: dict[str, dict] = {}
-LOCK = threading.Lock()
+APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+MUSIC_ROOT.mkdir(parents=True, exist_ok=True)
+
+app = Flask(__name__, static_folder="static", template_folder="templates")
+JOBS_LOCK = threading.Lock()
 
 
-def now_iso() -> str:
-    return time.strftime('%Y-%m-%dT%H:%M:%S')
+def load_jobs() -> list[dict]:
+    if JOBS_FILE.exists():
+        try:
+            return json.loads(JOBS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
 
 
-def safe_name(text: str) -> str:
-    text = re.sub(r'[^A-Za-z0-9._,()\- ]+', '_', str(text)).strip().strip('.')
-    text = re.sub(r'\s+', ' ', text)
-    return text[:180] or 'song'
+def save_jobs(jobs: list[dict]) -> None:
+    JOBS_FILE.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def normalize_artists(artists_raw: str) -> str:
-    parts = [p.strip() for p in re.split(r'\s*,\s*', artists_raw or '') if p.strip()]
-    return ', '.join(parts)
+def update_job(job_id: str, **updates) -> dict | None:
+    with JOBS_LOCK:
+        jobs = load_jobs()
+        for job in jobs:
+            if job["id"] == job_id:
+                job.update(updates)
+                job["updated_at"] = datetime.now().isoformat(timespec="seconds")
+                save_jobs(jobs)
+                return job
+    return None
 
 
-def final_song_name(song_name: str, artists: str, rename_to: str | None, youtube_url: str | None = None) -> str:
-    custom = (rename_to or '').strip()
-    if custom:
-        return safe_name(custom)
-    song_name = (song_name or '').strip()
-    artists = normalize_artists(artists)
-    if song_name and artists:
-        return safe_name(f'{song_name} - {artists}')
-    if song_name:
-        return safe_name(song_name)
-    if youtube_url:
-        return safe_name('downloaded-audio')
-    return safe_name('song')
+def create_job(payload: dict) -> dict:
+    job = {
+        "id": str(uuid.uuid4()),
+        "status": "queued",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+        "payload": payload,
+        "logs": [],
+        "output_file": "",
+        "final_file": "",
+        "error": "",
+    }
+    with JOBS_LOCK:
+        jobs = load_jobs()
+        jobs.insert(0, job)
+        save_jobs(jobs)
+    return job
 
 
-def query_text(song_name: str, artists: str, album_name: str) -> str:
-    pieces = [song_name.strip(), normalize_artists(artists), (album_name or '').strip(), 'official audio', '-video']
-    return ' '.join([p for p in pieces if p])
+def append_log(job_id: str, line: str) -> None:
+    with JOBS_LOCK:
+        jobs = load_jobs()
+        for job in jobs:
+            if job["id"] == job_id:
+                job.setdefault("logs", []).append(line)
+                job["updated_at"] = datetime.now().isoformat(timespec="seconds")
+                save_jobs(jobs)
+                return
 
 
-def within_allowed_root(dest: Path) -> bool:
-    resolved = dest.resolve()
-    for root in ALLOWED_DEST_ROOTS:
-        root_resolved = root.resolve()
-        if resolved == root_resolved or root_resolved in resolved.parents:
-            return True
-    return False
+def slugify_filename(text: str) -> str:
+    text = re.sub(r'[\\/:*?"<>|]+', "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or "downloaded-track"
 
 
-def ensure_destination(dest_path: str) -> Path:
-    target = Path(dest_path).expanduser()
-    if not target.is_absolute():
-        raise ValueError('destination_path must be absolute')
-    resolved = target.resolve()
-    if not within_allowed_root(resolved):
-        allowed = ', '.join(str(p.resolve()) for p in ALLOWED_DEST_ROOTS)
-        raise ValueError(f'destination_path must stay inside one of: {allowed}')
-    resolved.mkdir(parents=True, exist_ok=True)
-    return resolved
+def build_target_filename(song_name: str, artist_names: str, album_name: str) -> str:
+    song_name = slugify_filename(song_name or "Unknown Song")
+    artist_names = slugify_filename(artist_names or "Unknown Artist")
+    album_name = slugify_filename(album_name or "Unknown")
+    if album_name and album_name.lower() != "unknown":
+        return f"{song_name} - {album_name} - {artist_names}.mp3"
+    return f"{song_name} - {artist_names}.mp3"
 
 
-def reserve_target(dest_dir: Path, stem: str, suffix: str = '.mp3') -> Path:
-    target = dest_dir / f'{stem}{suffix}'
-    if not target.exists():
-        return target
+def safe_destination(path: Path) -> Path:
+    if not path.exists():
+        return path
+    stem, suffix = path.stem, path.suffix
     idx = 1
     while True:
-        candidate = dest_dir / f'{stem}_{idx}{suffix}'
-        if not candidate.exists():
-            return candidate
+        option = path.with_name(f"{stem} ({idx}){suffix}")
+        if not option.exists():
+            return option
         idx += 1
 
 
-def media_downloader_available() -> bool:
-    if not MEDIA_DOWNLOADER_BASE_URL:
-        return False
-    try:
-        with urlopen(MEDIA_DOWNLOADER_BASE_URL + '/api/health', timeout=3) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
+def yt_search_query(song_name: str, artist_names: str, album_name: str) -> str:
+    query = " ".join(x for x in [song_name, artist_names, album_name, "official audio"] if x)
+    return f"ytsearch1:{query.strip()}"
 
 
-def api_get(path: str):
-    with urlopen(MEDIA_DOWNLOADER_BASE_URL + path, timeout=10) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+def resolve_source(payload: dict) -> str:
+    youtube_url = (payload.get("youtube_url") or "").strip()
+    if youtube_url:
+        return youtube_url
+    return yt_search_query(
+        payload.get("song_name", "").strip(),
+        payload.get("artist_names", "").strip(),
+        payload.get("album_name", "").strip(),
+    )
 
 
-def api_post(path: str, payload: dict):
-    body = json.dumps(payload).encode('utf-8')
-    req = Request(MEDIA_DOWNLOADER_BASE_URL + path, data=body, headers={'Content-Type': 'application/json'}, method='POST')
-    with urlopen(req, timeout=15) as resp:
-        return json.loads(resp.read().decode('utf-8'))
-
-
-def poll_media_job(job_id: str, timeout: int = 1800) -> dict:
-    started = time.time()
-    while time.time() - started < timeout:
-        payload = api_get('/api/status')
-        jobs = payload.get('jobs', [])
-        match = next((j for j in jobs if j.get('id') == job_id), None)
-        if match and match.get('status') in {'completed', 'failed'}:
+def find_downloaded_file(download_dir: Path, marker: str) -> Path | None:
+    matches = sorted(download_dir.glob(f"{marker}*"))
+    for match in matches:
+        if match.is_file() and match.suffix.lower() == ".mp3":
             return match
-        time.sleep(2)
-    raise TimeoutError('Timed out waiting for Media Downloader job')
+    return None
 
 
-def update_job(job_id: str, **fields):
-    with LOCK:
-        job = JOBS.get(job_id)
-        if not job:
-            return
-        job.update(fields)
-        job['updated_at'] = now_iso()
+def run_download_job(job_id: str) -> None:
+    job = update_job(job_id, status="running")
+    if not job:
+        return
 
+    payload = job["payload"]
+    song_name = payload.get("song_name", "").strip()
+    artist_names = payload.get("artist_names", "").strip()
+    album_name = payload.get("album_name", "").strip() or "Unknown"
+    rename_to = payload.get("rename_to", "").strip()
+    auto_move = bool(payload.get("auto_move", True))
 
-def new_job(payload: dict) -> str:
-    job_id = str(uuid.uuid4())
-    display_name = payload.get('song_name') or payload.get('rename_to') or payload.get('youtube_url') or 'audio download'
-    with LOCK:
-        JOBS[job_id] = {
-            'id': job_id,
-            'status': 'queued',
-            'progress': 0,
-            'message': 'Queued',
-            'payload': payload,
-            'display_name': display_name,
-            'created_at': now_iso(),
-            'updated_at': now_iso(),
-            'final_path': None,
-            'download_backend': None,
-        }
-    return job_id
-
-
-def clear_jobs() -> int:
-    with LOCK:
-        before = len(JOBS)
-        removable = [job_id for job_id, job in JOBS.items() if job.get('status') in {'completed', 'failed'}]
-        for job_id in removable:
-            JOBS.pop(job_id, None)
-    return len(removable) if before else 0
-
-
-def resolve_source(youtube_url: str, query: str) -> tuple[str, str]:
-    url = (youtube_url or '').strip()
-    if not url:
-        return 'search', 'ytsearch1:' + query
-    parsed = urlparse(url)
-    if parsed.scheme not in {'http', 'https'}:
-        raise ValueError('youtube_url must begin with http:// or https://')
-    if not any(host in (parsed.netloc or '') for host in YOUTUBE_HOST_HINTS):
-        raise ValueError('youtube_url must be a YouTube or YouTube Music link')
-    return 'youtube_url', url
-
-
-def run_direct_download(job_id: str, source_value: str, destination_dir: Path, final_stem: str, source_kind: str):
-    update_job(job_id, status='starting', progress=5, message='Downloading with direct yt-dlp fallback…', download_backend='direct-yt-dlp')
     try:
-        import yt_dlp
+        append_log(job_id, "Preparing download job")
+        source = resolve_source(payload)
+        marker = f"job_{job_id.replace('-', '')}"
+        output_template = str(DOWNLOADS_DIR / f"{marker}.%(ext)s")
+
+        cmd = [
+            "yt-dlp",
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--embed-metadata",
+            "--no-playlist",
+            "-o", output_template,
+            source,
+        ]
+
+        append_log(job_id, "Running yt-dlp")
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.stdout:
+            for line in proc.stdout.splitlines():
+                append_log(job_id, line)
+        if proc.stderr:
+            for line in proc.stderr.splitlines():
+                append_log(job_id, line)
+        if proc.returncode != 0:
+            raise RuntimeError(f"yt-dlp failed with exit code {proc.returncode}")
+
+        downloaded = find_downloaded_file(DOWNLOADS_DIR, marker)
+        if not downloaded:
+            raise RuntimeError("Downloaded file not found after yt-dlp run")
+
+        target_name = rename_to or build_target_filename(song_name, artist_names, album_name)
+        final_path = safe_destination((MUSIC_ROOT if auto_move else DOWNLOADS_DIR) / target_name)
+
+        shutil.move(str(downloaded), str(final_path))
+        update_job(job_id, status="completed", output_file=str(downloaded), final_file=str(final_path))
+        append_log(job_id, f"Saved file: {final_path}")
+
     except Exception as exc:
-        update_job(job_id, status='failed', progress=100, message=f'yt-dlp is unavailable in the container: {exc}')
-        return
-
-    temp_dir = DOWNLOAD_ROOT / job_id
-    temp_dir.mkdir(parents=True, exist_ok=True)
-    output_template = str(temp_dir / '%(title).150B [%(id)s].%(ext)s')
-
-    def hook(d):
-        if d.get('status') == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
-            done = d.get('downloaded_bytes') or 0
-            pct = int((done / total) * 70) if total else 20
-            update_job(job_id, status='downloading', progress=max(10, min(pct, 75)), message=d.get('_percent_str', 'Downloading audio…').strip() or 'Downloading audio…')
-        elif d.get('status') == 'finished':
-            update_job(job_id, status='processing', progress=80, message='Extracting MP3…')
-
-    opts = {
-        'outtmpl': output_template,
-        'restrictfilenames': False,
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'progress_hooks': [hook],
-        'format': 'bestaudio/best',
-        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
-    }
-    if source_kind == 'search':
-        opts['default_search'] = 'ytsearch'
-
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.extract_info(source_value, download=True)
-    except Exception as exc:
-        update_job(job_id, status='failed', progress=100, message=str(exc))
-        return
-
-    candidates = sorted([p for p in temp_dir.rglob('*') if p.is_file()], key=lambda p: p.stat().st_mtime, reverse=True)
-    if not candidates:
-        update_job(job_id, status='failed', progress=100, message='No downloaded file was produced')
-        return
-    source = candidates[0]
-    suffix = source.suffix if source.suffix else '.mp3'
-    target = reserve_target(destination_dir, final_stem, suffix)
-    shutil.move(str(source), str(target))
-    shutil.rmtree(temp_dir, ignore_errors=True)
-    update_job(job_id, status='completed', progress=100, message='Song downloaded and transferred', final_path=str(target))
+        update_job(job_id, status="failed", error=str(exc))
+        append_log(job_id, f"ERROR: {exc}")
 
 
-def run_media_api_download(job_id: str, source_value: str, destination_dir: Path, final_stem: str, source_kind: str):
-    update_job(job_id, status='starting', progress=5, message='Requesting Media Downloader API…', download_backend='media-downloader-api')
-    try:
-        payload = {'url': source_value, 'mode': 'audio', 'audio_format': 'mp3'}
-        if source_kind == 'search':
-            payload['url'] = source_value
-        result = api_post('/api/download', payload)
-        md_job_id = result['job_id']
-    except (HTTPError, URLError, KeyError, TimeoutError) as exc:
-        update_job(job_id, status='failed', progress=100, message=f'Media Downloader API request failed: {exc}')
-        return
-
-    while True:
-        try:
-            state = poll_media_job(md_job_id)
-            break
-        except TimeoutError as exc:
-            update_job(job_id, status='failed', progress=100, message=str(exc))
-            return
-        except Exception as exc:
-            update_job(job_id, status='failed', progress=100, message=f'Polling Media Downloader failed: {exc}')
-            return
-
-    if state.get('status') == 'failed':
-        update_job(job_id, status='failed', progress=100, message=state.get('message') or 'Media Downloader failed')
-        return
-
-    relative_path = state.get('output_relative')
-    if not relative_path:
-        update_job(job_id, status='failed', progress=100, message='Media Downloader did not return an output_relative path')
-        return
-
-    update_job(job_id, status='processing', progress=85, message='Auto-transferring song into music library…')
-    try:
-        save_result = api_post('/api/save-as', {
-            'relative_path': relative_path,
-            'destination_path': str(destination_dir),
-            'new_name': final_stem + '.mp3',
-            'operation': 'move',
-        })
-        save_job_id = save_result['job_id']
-        saved_state = poll_media_job(save_job_id)
-    except Exception as exc:
-        update_job(job_id, status='failed', progress=100, message=f'Auto-transfer through Media Downloader failed: {exc}')
-        return
-
-    if saved_state.get('status') == 'failed':
-        update_job(job_id, status='failed', progress=100, message=saved_state.get('message') or 'Auto-transfer failed')
-        return
-
-    update_job(job_id, status='completed', progress=100, message='Song downloaded and transferred', final_path=saved_state.get('output_path'))
+@app.route("/")
+def index():
+    return send_from_directory(app.template_folder, "index.html")
 
 
-def worker(job_id: str):
-    payload = JOBS[job_id]['payload']
-    song_name = payload.get('song_name', '')
-    artists = payload.get('artists', '')
-    album_name = payload.get('album_name', '')
-    rename_to = payload.get('rename_to') or ''
-    youtube_url = payload.get('youtube_url') or ''
-    destination_path = payload.get('destination_path') or DEFAULT_DESTINATION_DIR
-
-    try:
-        destination_dir = ensure_destination(destination_path)
-        final_stem = final_song_name(song_name, artists, rename_to, youtube_url)
-        query = query_text(song_name, artists, album_name)
-        source_kind, source_value = resolve_source(youtube_url, query)
-    except Exception as exc:
-        update_job(job_id, status='failed', progress=100, message=str(exc))
-        return
-
-    if media_downloader_available():
-        run_media_api_download(job_id, source_value, destination_dir, final_stem, source_kind)
-        return
-    run_direct_download(job_id, source_value, destination_dir, final_stem, source_kind)
+@app.route("/static/<path:filename>")
+def static_files(filename: str):
+    return send_from_directory(app.static_folder, filename)
 
 
-def json_response(handler: BaseHTTPRequestHandler, payload: dict | list, code: int = HTTPStatus.OK, head_only: bool = False):
-    body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-    handler.send_response(code)
-    handler.send_header('Access-Control-Allow-Origin', '*')
-    handler.send_header('Content-Type', 'application/json; charset=utf-8')
-    handler.send_header('Content-Length', str(len(body)))
-    handler.end_headers()
-    if not head_only:
-        handler.wfile.write(body)
+@app.route("/api/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "name": APP_NAME,
+        "version": APP_VERSION,
+        "music_root": str(MUSIC_ROOT),
+        "downloads_dir": str(DOWNLOADS_DIR),
+    })
 
 
-def build_status_payload() -> dict:
-    with LOCK:
-        jobs = sorted(JOBS.values(), key=lambda item: item['created_at'], reverse=True)
-    return {
-        'status': 'ok',
-        'version': APP_VERSION,
-        'jobs': jobs,
-        'default_destination': DEFAULT_DESTINATION_DIR,
-        'media_downloader_base_url': MEDIA_DOWNLOADER_BASE_URL,
-        'media_downloader_available': media_downloader_available(),
-        'note': 'This app may use the Media Downloader API to fetch audio when that API is reachable. It falls back to direct yt-dlp when needed.'
-    }
+@app.route("/api/jobs", methods=["GET"])
+def get_jobs():
+    return jsonify({"jobs": load_jobs()})
 
 
-class Handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(HTTPStatus.NO_CONTENT)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS')
-        self.end_headers()
-
-    def _read_json(self):
-        length = int(self.headers.get('Content-Length', '0') or '0')
-        raw = self.rfile.read(length) if length else b'{}'
-        return json.loads(raw.decode('utf-8')) if raw else {}
-
-    def _serve_index(self, head_only: bool = False):
-        body = (STATIC_DIR / 'index.html').read_bytes()
-        self.send_response(HTTPStatus.OK)
-        self.send_header('Content-Type', 'text/html; charset=utf-8')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        if not head_only:
-            self.wfile.write(body)
-
-    def do_HEAD(self):
-        parsed = urlparse(self.path)
-        if parsed.path == '/':
-            return self._serve_index(head_only=True)
-        if parsed.path == '/api/health':
-            return json_response(self, {'status': 'ok', 'service': APP_NAME, 'version': APP_VERSION}, head_only=True)
-        if parsed.path == '/api/status':
-            return json_response(self, build_status_payload(), head_only=True)
-        return json_response(self, {'error': 'not found'}, HTTPStatus.NOT_FOUND, head_only=True)
-
-    def do_GET(self):
-        parsed = urlparse(self.path)
-        if parsed.path == '/':
-            return self._serve_index()
-        if parsed.path == '/api/health':
-            return json_response(self, {'status': 'ok', 'service': APP_NAME, 'version': APP_VERSION})
-        if parsed.path == '/api/status':
-            return json_response(self, build_status_payload())
-        return json_response(self, {'error': 'not found'}, HTTPStatus.NOT_FOUND)
-
-    def do_POST(self):
-        parsed = urlparse(self.path)
-        if parsed.path == '/api/clear-jobs':
-            cleared = clear_jobs()
-            return json_response(self, {'ok': True, 'cleared': cleared})
-        if parsed.path != '/api/download-song':
-            return json_response(self, {'error': 'not found'}, HTTPStatus.NOT_FOUND)
-
-        payload = self._read_json()
-        song_name = (payload.get('song_name') or '').strip()
-        artists = normalize_artists(payload.get('artists') or '')
-        album_name = (payload.get('album_name') or '').strip()
-        rename_to = (payload.get('rename_to') or '').strip()
-        destination_path = (payload.get('destination_path') or DEFAULT_DESTINATION_DIR).strip()
-        youtube_url = (payload.get('youtube_url') or '').strip()
-
-        if not youtube_url and not song_name:
-            return json_response(self, {'error': 'song_name is required when youtube_url is not provided'}, HTTPStatus.BAD_REQUEST)
-        if not youtube_url and not artists:
-            return json_response(self, {'error': 'artists is required when youtube_url is not provided'}, HTTPStatus.BAD_REQUEST)
-        if youtube_url and not (rename_to or (song_name and artists) or song_name):
-            return json_response(self, {'error': 'Provide rename_to or song_name when using a youtube_url so the final filename can be generated'}, HTTPStatus.BAD_REQUEST)
-
-        job_id = new_job({
-            'song_name': song_name,
-            'artists': artists,
-            'album_name': album_name,
-            'rename_to': rename_to,
-            'destination_path': destination_path,
-            'youtube_url': youtube_url,
-        })
-        threading.Thread(target=worker, args=(job_id,), daemon=True).start()
-        return json_response(self, {'ok': True, 'job_id': job_id})
+@app.route("/api/jobs/clear", methods=["POST"])
+def clear_jobs():
+    with JOBS_LOCK:
+        save_jobs([])
+    return jsonify({"ok": True})
 
 
-if __name__ == '__main__':
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f'{APP_NAME} listening on {PORT}', flush=True)
-    server.serve_forever()
+@app.route("/api/download", methods=["POST"])
+def download():
+    payload = request.get_json(force=True)
+    job = create_job(payload)
+    threading.Thread(target=run_download_job, args=(job["id"],), daemon=True).start()
+    return jsonify({"ok": True, "job_id": job["id"]})
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=PORT, debug=False)

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Song Downloader</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero-card">
+      <div class="hero-row">
+        <div>
+          <div class="eyebrow">Homelab Plugin</div>
+          <h1>Song Downloader</h1>
+          <p class="subtitle">
+            Download audio tracks using a YouTube link or by searching song name, artist names, and optional album/movie.
+            Files can be auto-moved into your music library using the naming style your music-player expects.
+          </p>
+        </div>
+        <button id="refreshJobsBtn" class="ghost-btn">Refresh jobs</button>
+      </div>
+
+      <form id="downloadForm" class="download-form">
+        <div class="field-grid">
+          <label>
+            <span>Song name</span>
+            <div class="input-wrap">
+              <input type="text" id="song_name" placeholder="Tum Hi Ho" />
+              <button type="button" class="clear-btn" data-target="song_name">×</button>
+            </div>
+          </label>
+
+          <label>
+            <span>Artist names</span>
+            <div class="input-wrap">
+              <input type="text" id="artist_names" placeholder="Arijit Singh" />
+              <button type="button" class="clear-btn" data-target="artist_names">×</button>
+            </div>
+          </label>
+
+          <label>
+            <span>Album / movie (optional)</span>
+            <div class="input-wrap">
+              <input type="text" id="album_name" placeholder="Aashiqui 2" />
+              <button type="button" class="clear-btn" data-target="album_name">×</button>
+            </div>
+          </label>
+
+          <label>
+            <span>YouTube link (optional)</span>
+            <div class="input-wrap">
+              <input type="url" id="youtube_url" placeholder="https://www.youtube.com/watch?v=..." />
+              <button type="button" class="clear-btn" data-target="youtube_url">×</button>
+            </div>
+          </label>
+
+          <label class="full-width">
+            <span>Rename to (optional)</span>
+            <div class="input-wrap">
+              <input type="text" id="rename_to" placeholder="Tum Hi Ho - Aashiqui 2 - Arijit Singh.mp3" />
+              <button type="button" class="clear-btn" data-target="rename_to">×</button>
+            </div>
+          </label>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="auto_move" checked />
+          <span>Auto move final file to <code>/mnt/nas/media/music</code></span>
+        </label>
+
+        <div class="form-actions">
+          <button type="submit" class="primary-btn">Start download</button>
+          <button type="button" id="clearJobsBtn" class="ghost-btn danger">Clear jobs</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="jobs-card">
+      <div class="jobs-header">
+        <h2>Jobs</h2>
+        <div id="healthStatus" class="health-pill">Checking…</div>
+      </div>
+      <div id="jobsContainer" class="jobs-container">
+        <div class="empty-state">No jobs yet.</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/js/script.js"></script>
+</body>
+</html>

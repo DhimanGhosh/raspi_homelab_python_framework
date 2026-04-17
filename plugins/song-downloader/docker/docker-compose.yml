@@ -2,21 +2,17 @@ services:
   song-downloader:
     build: .
     container_name: song-downloader
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: "8145"
+      APP_NAME: "Song Downloader"
+      APP_VERSION: "1.0.2"
+      MUSIC_ROOT: "/mnt/nas/media/music"
+      APP_DATA_DIR: "/mnt/nas/homelab/runtime/song-downloader/data"
+      DOWNLOADS_DIR: "/mnt/nas/homelab/runtime/song-downloader/downloads"
     ports:
       - "127.0.0.1:8145:8145"
-    environment:
-      APP_NAME: Song Downloader
-      APP_VERSION: 1.0.1
-      PORT: 8145
-      APP_DATA_DIR: /data
-      DOWNLOAD_ROOT: /data/downloads
-      DEFAULT_DESTINATION_DIR: /mnt/nas/media/music
-      MEDIA_DOWNLOADER_BASE_URL: http://host.docker.internal:8160
-      ALLOWED_DEST_ROOTS: /mnt/nas:/data
-      PYTHONUNBUFFERED: "1"
     volumes:
-      - /mnt/nas/homelab/runtime/song-downloader/data:/data
-      - /mnt/nas:/mnt/nas
+      - /mnt/nas/media/music:/mnt/nas/media/music
+      - /mnt/nas/homelab/runtime/song-downloader/data:/mnt/nas/homelab/runtime/song-downloader/data
+      - /mnt/nas/homelab/runtime/song-downloader/downloads:/mnt/nas/homelab/runtime/song-downloader/downloads
+    restart: unless-stopped

@@ -1,15 +1,14 @@
 {
   "id": "song-downloader",
   "name": "Song Downloader",
-  "version": "1.0.1",
+  "version": "1.0.2",
+  "runtime_type": "docker",
   "network": {
-    "internal_port": 8145
+    "internal_port": 8145,
+    "public_port": 8445
   },
   "entrypoint": {
     "type": "web",
     "path": "/"
-  },
-  "backend": {
-    "type": "docker"
   }
 }
