@@ -60,7 +60,7 @@
     "song-downloader": {
       "id": "song-downloader",
       "name": "Song Downloader",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/song-downloader",
       "network": {
         "internal_port": 8145,
@@ -71,6 +71,20 @@
         "path": "/"
       },
       "public_url": "https://pi-nas.taild4713b.ts.net:8445/"
+    },
+    "files": {
+      "id": "files",
+      "name": "Files",
+      "version": "1.3.0",
+      "installed_dir": "/home/pi/homelab_os/runtime/installed_plugins/files",
+      "network": {
+        "internal_port": 8088
+      },
+      "entrypoint": {
+        "type": "web",
+        "path": "/files/Incoming/"
+      },
+      "public_url": "https://pi-nas.taild4713b.ts.net:8449/"
     }
   }
 }

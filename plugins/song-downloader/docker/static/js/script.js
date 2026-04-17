@@ -3,7 +3,7 @@ const el = (id) => document.getElementById(id);
 async function fetchHealth() {
   const res = await fetch('/api/health');
   const data = await res.json();
-  el('healthStatus').textContent = `${data.status.toUpperCase()} • v${data.version}`;
+  el('healthStatus').textContent = `OK • v${data.version}`;
 }
 
 function buildPayload() {
@@ -17,6 +17,11 @@ function buildPayload() {
   };
 }
 
+function progressWidth(job) {
+  const value = Number(job.progress || 0);
+  return `${Math.max(0, Math.min(100, value))}%`;
+}
+
 function renderJobs(jobs) {
   const container = el('jobsContainer');
   container.innerHTML = '';
@@ -26,6 +31,10 @@ function renderJobs(jobs) {
   }
 
   jobs.forEach((job) => {
+    const song = job.payload?.song_name || '—';
+    const artists = job.payload?.artist_names || '—';
+    const album = job.payload?.album_name || 'Unknown';
+    const youtube = job.payload?.youtube_url || 'Search mode';
     const card = document.createElement('article');
     card.className = 'job-card';
     card.innerHTML = `
@@ -37,12 +46,16 @@ function renderJobs(jobs) {
         <div class="job-id">${job.id.slice(0, 8)}</div>
       </div>
       <div class="job-main">
-        <div><strong>Song:</strong> ${job.payload.song_name || '—'}</div>
-        <div><strong>Artists:</strong> ${job.payload.artist_names || '—'}</div>
-        <div><strong>Album:</strong> ${job.payload.album_name || 'Unknown'}</div>
-        <div><strong>YouTube:</strong> ${job.payload.youtube_url || 'Search mode'}</div>
+        <div><strong>Song:</strong> ${song}</div>
+        <div><strong>Artists:</strong> ${artists}</div>
+        <div><strong>Album:</strong> ${album}</div>
+        <div><strong>YouTube:</strong> ${youtube}</div>
         <div><strong>Final file:</strong> ${job.final_file || '—'}</div>
         <div><strong>Error:</strong> ${job.error || '—'}</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><span style="width:${progressWidth(job)}"></span></div>
+        <div class="progress-label">${job.progress || 0}%</div>
       </div>
       <details class="logs-box">
         <summary>Logs</summary>
@@ -100,5 +113,5 @@ window.addEventListener('DOMContentLoaded', () => {
 
   fetchHealth();
   fetchJobs();
-  setInterval(fetchJobs, 5000);
+  setInterval(fetchJobs, 1500);
 });

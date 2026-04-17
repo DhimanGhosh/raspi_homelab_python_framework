@@ -1,4 +1,3 @@
-\
 from __future__ import annotations
 
 import json
@@ -14,7 +13,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 
 APP_NAME = os.getenv("APP_NAME", "Song Downloader")
-APP_VERSION = os.getenv("APP_VERSION", "1.0.2")
+APP_VERSION = os.getenv("APP_VERSION", "1.0.3")
 PORT = int(os.getenv("PORT", "8145"))
 MUSIC_ROOT = Path(os.getenv("MUSIC_ROOT", "/mnt/nas/media/music")).resolve()
 APP_DATA_DIR = Path(os.getenv("APP_DATA_DIR", "/mnt/nas/homelab/runtime/song-downloader/data")).resolve()
@@ -55,12 +54,21 @@ def update_job(job_id: str, **updates) -> dict | None:
 
 
 def create_job(payload: dict) -> dict:
+    normalized = {
+        "song_name": (payload.get("song_name") or "").strip(),
+        "artist_names": (payload.get("artist_names") or "").strip(),
+        "album_name": (payload.get("album_name") or "").strip() or "Unknown",
+        "youtube_url": (payload.get("youtube_url") or "").strip(),
+        "rename_to": (payload.get("rename_to") or "").strip(),
+        "auto_move": bool(payload.get("auto_move", True)),
+    }
     job = {
         "id": str(uuid.uuid4()),
         "status": "queued",
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "updated_at": datetime.now().isoformat(timespec="seconds"),
-        "payload": payload,
+        "payload": normalized,
+        "progress": 0,
         "logs": [],
         "output_file": "",
         "final_file": "",
@@ -90,6 +98,17 @@ def slugify_filename(text: str) -> str:
     return text or "downloaded-track"
 
 
+def infer_parts_from_rename(rename_to: str) -> tuple[str, str, str]:
+    parts = [p.strip() for p in rename_to.replace('.mp3', '').split(' - ') if p.strip()]
+    if len(parts) >= 3:
+        return parts[0], parts[1], ' - '.join(parts[2:])
+    if len(parts) == 2:
+        return parts[0], "Unknown", parts[1]
+    if len(parts) == 1:
+        return parts[0], "Unknown", "Unknown Artist"
+    return "", "Unknown", "Unknown Artist"
+
+
 def build_target_filename(song_name: str, artist_names: str, album_name: str) -> str:
     song_name = slugify_filename(song_name or "Unknown Song")
     artist_names = slugify_filename(artist_names or "Unknown Artist")
@@ -112,7 +131,7 @@ def safe_destination(path: Path) -> Path:
 
 
 def yt_search_query(song_name: str, artist_names: str, album_name: str) -> str:
-    query = " ".join(x for x in [song_name, artist_names, album_name, "official audio"] if x)
+    query = " ".join(x for x in [song_name, artist_names, album_name, "official audio"] if x and x.lower() != "unknown")
     return f"ytsearch1:{query.strip()}"
 
 
@@ -135,8 +154,15 @@ def find_downloaded_file(download_dir: Path, marker: str) -> Path | None:
     return None
 
 
+def update_progress_from_line(job_id: str, line: str) -> None:
+    match = re.search(r"(\d{1,3}(?:\.\d+)?)%", line)
+    if match:
+        pct = int(float(match.group(1)))
+        update_job(job_id, progress=max(1, min(99, pct)))
+
+
 def run_download_job(job_id: str) -> None:
-    job = update_job(job_id, status="running")
+    job = update_job(job_id, status="running", progress=1)
     if not job:
         return
 
@@ -148,6 +174,14 @@ def run_download_job(job_id: str) -> None:
     auto_move = bool(payload.get("auto_move", True))
 
     try:
+        if rename_to and (not song_name or not artist_names or album_name == "Unknown"):
+            inferred_song, inferred_album, inferred_artists = infer_parts_from_rename(rename_to)
+            song_name = song_name or inferred_song
+            artist_names = artist_names or inferred_artists
+            if album_name == "Unknown" and inferred_album:
+                album_name = inferred_album
+            update_job(job_id, payload={**payload, "song_name": song_name, "artist_names": artist_names, "album_name": album_name})
+
         append_log(job_id, "Preparing download job")
         source = resolve_source(payload)
         marker = f"job_{job_id.replace('-', '')}"
@@ -155,6 +189,8 @@ def run_download_job(job_id: str) -> None:
 
         cmd = [
             "yt-dlp",
+            "--newline",
+            "--progress",
             "--extract-audio",
             "--audio-format", "mp3",
             "--audio-quality", "0",
@@ -165,25 +201,29 @@ def run_download_job(job_id: str) -> None:
         ]
 
         append_log(job_id, "Running yt-dlp")
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.stdout:
-            for line in proc.stdout.splitlines():
-                append_log(job_id, line)
-        if proc.stderr:
-            for line in proc.stderr.splitlines():
-                append_log(job_id, line)
-        if proc.returncode != 0:
-            raise RuntimeError(f"yt-dlp failed with exit code {proc.returncode}")
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        assert proc.stdout is not None
+        for raw_line in proc.stdout:
+            line = raw_line.rstrip()
+            if not line:
+                continue
+            append_log(job_id, line)
+            update_progress_from_line(job_id, line)
+        return_code = proc.wait()
+        if return_code != 0:
+            raise RuntimeError(f"yt-dlp failed with exit code {return_code}")
 
         downloaded = find_downloaded_file(DOWNLOADS_DIR, marker)
         if not downloaded:
             raise RuntimeError("Downloaded file not found after yt-dlp run")
 
         target_name = rename_to or build_target_filename(song_name, artist_names, album_name)
+        if not target_name.lower().endswith('.mp3'):
+            target_name = f"{target_name}.mp3"
         final_path = safe_destination((MUSIC_ROOT if auto_move else DOWNLOADS_DIR) / target_name)
 
         shutil.move(str(downloaded), str(final_path))
-        update_job(job_id, status="completed", output_file=str(downloaded), final_file=str(final_path))
+        update_job(job_id, status="completed", progress=100, output_file=str(downloaded), final_file=str(final_path), payload={**payload, "song_name": song_name, "artist_names": artist_names, "album_name": album_name})
         append_log(job_id, f"Saved file: {final_path}")
 
     except Exception as exc:
