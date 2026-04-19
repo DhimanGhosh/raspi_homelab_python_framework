@@ -112,7 +112,9 @@ async function submitDownload(event) {
 
 async function clearJobs() {
   openLogs.clear();
-  await fetch('/api/jobs/clear', { method: 'POST' });
+  const res = await fetch('/api/jobs/clear', { method: 'POST' });
+  const data = await res.json();
+  if (Number(data.cleared || 0) === 0) alert('No completed jobs to clear. Running and queued jobs are kept.');
   fetchJobs();
 }
 

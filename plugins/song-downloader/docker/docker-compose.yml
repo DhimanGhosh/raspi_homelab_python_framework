@@ -1,7 +1,6 @@
 services:
   song-downloader:
     build: .
-    container_name: song-downloader
     environment:
       PORT: "8145"
       APP_NAME: "Song Downloader"

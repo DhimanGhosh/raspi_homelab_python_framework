@@ -10,6 +10,17 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+try:
+    from mutagen.easyid3 import EasyID3
+    from mutagen.id3 import ID3, APIC, error as ID3Error
+    from mutagen.mp3 import MP3
+except Exception:  # pragma: no cover
+    EasyID3 = None
+    ID3 = None
+    APIC = None
+    ID3Error = Exception
+    MP3 = None
+
 from flask import Flask, jsonify, request, send_from_directory
 
 APP_NAME = os.getenv("APP_NAME", "Song Downloader")
@@ -135,6 +146,28 @@ def find_downloaded_file(download_dir: Path, marker: str) -> Path | None:
     return None
 
 
+def apply_audio_metadata(file_path: Path, song_name: str, artist_names: str, album_name: str) -> None:
+    if file_path.suffix.lower() != ".mp3" or EasyID3 is None:
+        return
+    album_value = (album_name or "Unknown").strip() or "Unknown"
+    try:
+        tags = EasyID3(str(file_path))
+    except Exception:
+        tags = EasyID3()
+    tags["title"] = [song_name or file_path.stem]
+    tags["artist"] = [artist_names or "Unknown Artist"]
+    tags["album"] = [album_value]
+    tags.save(str(file_path))
+
+
+def detect_title_artist_album(file_path: Path) -> tuple[str, str, str]:
+    base = file_path.stem
+    parts = [part.strip() for part in base.split(" - ") if part.strip()]
+    if len(parts) >= 3:
+        return parts[0], parts[-1], parts[-2]
+    if len(parts) == 2:
+        return parts[0], parts[-1], "Unknown"
+    return base, "Unknown Artist", "Unknown"
 
 
 def set_progress(job_id: str, value: int) -> None:
@@ -224,6 +257,13 @@ def run_download_job(job_id: str) -> None:
         final_path = safe_destination((MUSIC_ROOT if auto_move else DOWNLOADS_DIR) / target_name)
 
         shutil.move(str(downloaded), str(final_path))
+        detected_song_name, detected_artist_names, detected_album_name = detect_title_artist_album(final_path)
+        apply_audio_metadata(
+            final_path,
+            song_name or detected_song_name,
+            artist_names or detected_artist_names,
+            album_name or detected_album_name,
+        )
         update_job(
             job_id,
             status="completed",
@@ -275,8 +315,11 @@ def get_jobs():
 @app.route("/api/jobs/clear", methods=["POST"])
 def clear_jobs():
     with JOBS_LOCK:
-        save_jobs([])
-    return jsonify({"ok": True})
+        jobs = load_jobs()
+        remaining = [job for job in jobs if job.get("status") not in {"completed", "failed"}]
+        cleared = len(jobs) - len(remaining)
+        save_jobs(remaining)
+    return jsonify({"ok": True, "cleared": cleared})
 
 
 @app.route("/api/download", methods=["POST"])

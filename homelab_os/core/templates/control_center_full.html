@@ -11,9 +11,12 @@
 <body oncontextmenu="return false;">
   <div class="container">
     <header class="hero">
-      <div>
+      <div class="hero-left-wrap">
+        <button id="deviceRestartBtn" class="danger-soft restart-btn" type="button">Restart Pi</button>
+        <div>
         <h1>Pi Control Center</h1>
         <div class="muted">Control OS for your Pi-NAS</div>
+        </div>
       </div>
       <div class="hero-actions">
         <div class="search-wrap">
@@ -42,6 +45,8 @@
         <button id="menuUpdateAllBtn" class="secondary">Update All</button>
       </div>
     </aside>
+
+    <section id="notificationsCard" class="card" style="display:none"><div class="row between"><h2>Notifications</h2></div><div id="notificationsArea" class="muted"></div></section>
 
     <section class="card storage">
       <h2>Storage</h2>

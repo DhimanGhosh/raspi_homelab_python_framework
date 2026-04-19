@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+from datetime import datetime
 from pathlib import Path
 from shutil import disk_usage
 
@@ -114,6 +116,30 @@ def _app_name(app_id: str, installed_meta: dict | None, catalog_meta: dict | Non
     return app_id.replace("-", " ").title()
 
 
+def _reboot_notice_file(settings) -> Path:
+    return settings.runtime_dir / "device_reboot_notice.json"
+
+
+def _load_notifications(settings) -> list[dict]:
+    notifications: list[dict] = []
+    notice_file = _reboot_notice_file(settings)
+    if notice_file.exists():
+        try:
+            payload = json.loads(notice_file.read_text(encoding="utf-8"))
+            notifications.append({
+                "id": "device-reboot-complete",
+                "message": payload.get("message") or "device reboot completed and system online",
+                "created_at": payload.get("created_at") or "",
+                "type": "success",
+            })
+        except Exception:
+            notifications.append({"id": "device-reboot-complete", "message": "device reboot completed and system online", "created_at": "", "type": "success"})
+        try:
+            notice_file.unlink()
+        except Exception:
+            pass
+    return notifications
+
 def _app_port(app_id: str, settings, catalog_meta: dict | None):
     if app_id == "control-center":
         return settings.control_center_public_port
@@ -181,7 +207,7 @@ def control_center_summary() -> dict:
         "nas_usage": _usage(settings.nas_mount),
         "homelab_usage": _usage(settings.homelab_root),
         "root_usage": _usage(Path("/")),
-        "notifications": [],
+        "notifications": _load_notifications(settings),
     }
 
 
@@ -211,6 +237,22 @@ def _install_job(job_id: str, archive_path: str, auto_start: bool = False) -> No
         except Exception as rollback_exc:
             logs.append_job_log(job_id, f"Rollback failed: {rollback_exc}")
         jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
+
+
+@router.post("/control-center/device/restart")
+def restart_device() -> dict:
+    settings, registry, jobs, logs, runtime, installer, proxy = _services()
+    notice_file = _reboot_notice_file(settings)
+    notice_file.write_text(json.dumps({
+        "message": "device reboot completed and system online",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    }, ensure_ascii=False), encoding="utf-8")
+    command = "nohup bash -lc 'sleep 2; sudo reboot' >/dev/null 2>&1 &"
+    try:
+        subprocess.Popen(command, shell=True)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to schedule reboot: {exc}")
+    return {"ok": True, "message": "Reboot scheduled"}
 
 
 @router.post("/control-center/install")

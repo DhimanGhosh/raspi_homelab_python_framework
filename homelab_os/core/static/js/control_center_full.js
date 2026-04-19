@@ -35,6 +35,26 @@ function setMetric(id, usage) {
   if (el) el.textContent = `${usage.used_gb || 0} GB / ${usage.total_gb || 0} GB`;
 }
 
+
+function renderNotifications() {
+  const card = document.getElementById('notificationsCard');
+  const area = document.getElementById('notificationsArea');
+  const notifications = state.notifications || [];
+  if (!notifications.length) {
+    card.style.display = 'none';
+    area.innerHTML = '';
+    return;
+  }
+  card.style.display = 'block';
+  area.innerHTML = notifications.map((item) => `<div class="notification-item">${esc(item.message)}${item.created_at ? `<span class="notification-time">${esc(item.created_at)}</span>` : ''}</div>`).join('');
+}
+
+async function restartDevice() {
+  if (!confirm('Restart the Raspberry Pi now?')) return;
+  await apiJson('/control-center/device/restart', { method: 'POST' });
+  alert('Reboot scheduled. The Control Center will come back once the device is online again.');
+}
+
 function renderHeader() {
   document.getElementById('versionBadge').textContent = `v${state.current_version}`;
   document.getElementById('bundleCount').textContent = String(state.total_bundles || 0);
@@ -135,6 +155,7 @@ async function refreshSummary() {
     openBundleId = null;
   }
   renderHeader();
+  renderNotifications();
   renderApps();
   renderJobs();
   if (selectedJobId) refreshSelectedLog();
@@ -246,3 +267,5 @@ document.getElementById('logBox')?.addEventListener('scroll', () => { const box 
 
 refreshSummary();
 setInterval(refreshSummary, 4000);
+
+document.getElementById('deviceRestartBtn')?.addEventListener('click', () => restartDevice().catch((err) => alert(String(err))));

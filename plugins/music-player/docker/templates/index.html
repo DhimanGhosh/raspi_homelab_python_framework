@@ -8,6 +8,7 @@
 </head>
 <body>
   <div id="mobileOverlay" class="mobile-overlay hidden"></div>
+  <div id="contextMenu" class="context-menu hidden"></div>
 
   <div class="app-shell">
     <aside id="sidebar" class="sidebar">
@@ -25,6 +26,7 @@
         <button class="nav-btn active" data-view="all">All Songs</button>
         <button class="nav-btn" data-view="playlists">Playlists</button>
         <button class="nav-btn" data-view="artists">Artists</button>
+        <button class="nav-btn" data-view="albums">Albums</button>
         <button class="nav-btn" data-view="folders">Folders</button>
       </nav>
 
@@ -38,17 +40,21 @@
       <header class="topbar">
         <div class="topbar-left">
           <button id="menuToggle" class="icon-btn menu-toggle">☰</button>
-          <input id="searchInput" class="search-input" placeholder="Search songs, artists, folders" />
+          <div class="search-wrap">
+            <input id="searchInput" class="search-input" placeholder="Search songs, artists, albums, folders" />
+            <button id="clearSearchBtn" class="search-clear hidden">✕</button>
+          </div>
         </div>
         <div class="topbar-actions">
           <button id="shuffleAllBtn" class="ghost-btn">Shuffle all</button>
+          <button id="openSettingsBtn" class="ghost-btn">Transition settings</button>
           <button id="refreshBtn" class="ghost-btn">Refresh</button>
         </div>
       </header>
 
-      <section class="selection-bar">
+      <section id="selectionBar" class="selection-bar hidden">
         <div id="selectedCount" class="selected-count">0 selected</div>
-        <div class="selection-actions hidden">
+        <div class="selection-actions">
           <button id="addToPlaylistBtn" class="primary-btn" disabled>Add to playlist</button>
           <button id="addToFolderBtn" class="ghost-btn" disabled>Add to folder</button>
           <button id="clearSelectionBtn" class="ghost-btn" disabled>Clear selection</button>
@@ -57,8 +63,11 @@
 
       <section class="content-card">
         <div class="content-head">
-          <h2 id="contentTitle">All Songs</h2>
-          <div id="contentMeta" class="content-meta"></div>
+          <div>
+            <h2 id="contentTitle">All Songs</h2>
+            <div id="contentMeta" class="content-meta"></div>
+          </div>
+          <div id="contentActions" class="content-actions"></div>
         </div>
         <div id="tracksContainer" class="tracks-container"></div>
       </section>
@@ -66,9 +75,24 @@
   </div>
 
   <footer class="player-bar">
-    <div class="now-playing">
-      <div id="nowTitle" class="now-title">Nothing playing</div>
-      <div id="nowArtist" class="now-artist">Select a track</div>
+    <div class="now-playing-card">
+      <div class="now-visual">
+        <img id="nowCover" class="now-cover" alt="Album art" />
+        <div id="nowCoverFallback" class="now-cover-fallback">♪</div>
+      </div>
+      <div class="now-details">
+        <div class="now-head-row">
+          <div class="now-texts">
+            <div id="nowTitle" class="now-title">Nothing playing</div>
+            <div id="nowArtist" class="now-artist">Select a track</div>
+            <div id="nowAlbum" class="now-meta-line">Album: Unknown</div>
+            <div id="nowMeta" class="now-meta-line">0:00</div>
+          </div>
+          <button id="nowMoreBtn" class="icon-btn">⋯</button>
+        </div>
+        <div id="nowLyrics" class="now-lyrics">Lyrics will appear here when available.</div>
+        <div id="queueSummary" class="queue-summary">Queue: 0 song(s)</div>
+      </div>
     </div>
 
     <div class="player-controls">
@@ -76,8 +100,8 @@
         <button id="prevBtn" class="icon-btn">⏮</button>
         <button id="playPauseBtn" class="icon-btn">▶</button>
         <button id="nextBtn" class="icon-btn">⏭</button>
-        <button id="shuffleToggleBtn" class="icon-btn">🔀</button>
-        <button id="repeatToggleBtn" class="icon-btn">Off</button>
+        <button id="shuffleToggleBtn" class="icon-btn" title="Shuffle">🔀</button>
+        <button id="repeatToggleBtn" class="icon-btn" title="Repeat mode">Off</button>
       </div>
       <div class="seek-row">
         <span id="currentTime">0:00</span>
@@ -87,7 +111,8 @@
     </div>
   </footer>
 
-  <audio id="audioPlayer" preload="metadata"></audio>
+  <audio id="audioPlayerA" preload="metadata"></audio>
+  <audio id="audioPlayerB" preload="metadata"></audio>
 
   <div id="playlistModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" data-close="playlist"></div>
@@ -97,6 +122,7 @@
         <button id="closePlaylistModalBtn" class="close-btn">×</button>
       </div>
       <div class="modal-body">
+        <div id="playlistModalSongName" class="modal-target"></div>
         <div id="lastPlaylistBlock" class="last-playlist-block hidden">
           <div class="muted-label">Last added to</div>
           <button id="lastPlaylistBtn" class="playlist-chip"></button>
@@ -112,6 +138,23 @@
     </div>
   </div>
 
+  <div id="duplicateModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close="duplicate"></div>
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-head">
+        <h3>Song already exists</h3>
+        <button id="closeDuplicateModalBtn" class="close-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="duplicateMessage" class="modal-target"></div>
+        <div class="modal-actions">
+          <button id="duplicateSkipBtn" class="ghost-btn">Skip duplicates</button>
+          <button id="duplicateAddBtn" class="primary-btn">Add anyway</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="folderModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" data-close="folder"></div>
     <div class="modal-dialog">
@@ -120,6 +163,7 @@
         <button id="closeFolderModalBtn" class="close-btn">×</button>
       </div>
       <div class="modal-body">
+        <div id="folderModalSongName" class="modal-target"></div>
         <div class="muted-label">Existing folders</div>
         <div id="folderList" class="playlist-list"></div>
         <div class="muted-label">Create a new folder</div>
@@ -146,6 +190,28 @@
         </div>
         <div class="muted-label">Delete playlist</div>
         <button id="deletePlaylistBtn" class="danger-btn">Delete playlist</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close="settings"></div>
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-head">
+        <h3>Smooth transition settings</h3>
+        <button id="closeSettingsModalBtn" class="close-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="checkbox-row">
+          <input id="crossfadeEnabled" type="checkbox" />
+          <span>Enable fade out + fade in transition</span>
+        </label>
+        <label>
+          <span>Fade duration (seconds)</span>
+          <input id="crossfadeSeconds" type="range" min="0" max="12" value="4" />
+          <div id="crossfadeSecondsLabel" class="muted-label">4s</div>
+        </label>
+        <button id="saveSettingsBtn" class="primary-btn">Save settings</button>
       </div>
     </div>
   </div>
