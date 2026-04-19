@@ -18,7 +18,10 @@
             Files can be auto-moved into your music library using the naming style your music-player expects.
           </p>
         </div>
-        <button id="refreshJobsBtn" class="ghost-btn">Refresh jobs</button>
+        <div class="hero-actions">
+          <div id="healthStatus" class="health-pill">Checking…</div>
+          <button id="refreshJobsBtn" class="ghost-btn">Refresh jobs</button>
+        </div>
       </div>
 
       <form id="downloadForm" class="download-form">
@@ -42,7 +45,7 @@
           <label>
             <span>Album / movie (optional)</span>
             <div class="input-wrap">
-              <input type="text" id="album_name" placeholder="Aashiqui 2" />
+              <input type="text" id="album_name" placeholder="Aashiqui 2 / Fighter" />
               <button type="button" class="clear-btn" data-target="album_name">×</button>
             </div>
           </label>
@@ -58,7 +61,7 @@
           <label class="full-width">
             <span>Rename to (optional)</span>
             <div class="input-wrap">
-              <input type="text" id="rename_to" placeholder="Tum Hi Ho - Aashiqui 2 - Arijit Singh.mp3" />
+              <input type="text" id="rename_to" placeholder="Sher Khul Gaye - Fighter - Benny Dayal, Shilpa Rao, Vishal, Sheykhar" />
               <button type="button" class="clear-btn" data-target="rename_to">×</button>
             </div>
           </label>
@@ -79,7 +82,6 @@
     <section class="jobs-card">
       <div class="jobs-header">
         <h2>Jobs</h2>
-        <div id="healthStatus" class="health-pill">Checking…</div>
       </div>
       <div id="jobsContainer" class="jobs-container">
         <div class="empty-state">No jobs yet.</div>

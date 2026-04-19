@@ -76,7 +76,9 @@ class PluginInstaller:
             target_dir = self.installed_plugins_dir / plugin_id
 
             self._cleanup_existing_install(plugin_id)
-            shutil.copytree(source_dir, target_dir)
+            if target_dir.exists():
+                shutil.rmtree(target_dir, ignore_errors=True)
+            shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
 
         public_url = self._prepare_public_url(plugin_id, manifest)
         entry = {

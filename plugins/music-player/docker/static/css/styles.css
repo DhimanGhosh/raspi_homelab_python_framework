@@ -484,3 +484,122 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v7.2.0 mobile footer visibility hardening */
+@media (max-width: 900px) {
+  html, body {
+    overflow-x: hidden !important;
+  }
+
+  body {
+    padding-bottom: calc(170px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .player-bar {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 9999 !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) 12px !important;
+    background: #0f1626 !important;
+    border-top: 1px solid #24324c !important;
+  }
+
+  .player-controls {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .control-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .seek-row {
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) 42px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-top: 8px !important;
+  }
+
+  #seekBar {
+    width: 100% !important;
+    display: block !important;
+    min-width: 0 !important;
+  }
+
+  .now-playing {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+}
+
+/* final mobile layout hardening patch */
+@media (max-width: 900px) {
+  body {
+    padding-bottom: calc(190px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .app-shell {
+    height: calc(100vh - 190px - env(safe-area-inset-bottom, 0px)) !important;
+    min-height: 0 !important;
+  }
+
+  .main-panel {
+    min-height: 0 !important;
+    height: 100% !important;
+    display: grid !important;
+    grid-template-rows: auto auto 1fr !important;
+  }
+
+  .content-card {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto 1fr !important;
+  }
+
+  .tracks-container {
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow-y: auto !important;
+    padding-bottom: 10px !important;
+  }
+
+  .player-bar {
+    min-height: 150px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .seek-row {
+    grid-template-columns: 48px minmax(0, 1fr) 48px !important;
+    padding: 0 8px !important;
+  }
+
+  .seek-row span,
+  #currentTime,
+  #totalTime {
+    font-size: 0.95rem !important;
+    text-align: center !important;
+  }
+
+  .control-row {
+    padding: 0 8px !important;
+  }
+
+  .track-row {
+    min-height: 74px !important;
+  }
+}

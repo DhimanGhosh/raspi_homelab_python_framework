@@ -1,6 +1,7 @@
 services:
   files:
     image: filebrowser/filebrowser:latest
+    pull_policy: always
     container_name: homelab-files
     restart: unless-stopped
     user: "0:0"

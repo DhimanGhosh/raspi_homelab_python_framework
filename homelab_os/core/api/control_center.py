@@ -204,6 +204,12 @@ def _install_job(job_id: str, archive_path: str, auto_start: bool = False) -> No
         jobs.update_job(job_id, status="completed", progress=100, result=result)
     except Exception as exc:
         logs.append_job_log(job_id, f"Install failed: {exc}")
+        try:
+            if 'result' in locals() and auto_start and result.get("id"):
+                logs.append_job_log(job_id, f"Rolling back failed install for {result['id']}")
+                installer.uninstall_plugin(result["id"])
+        except Exception as rollback_exc:
+            logs.append_job_log(job_id, f"Rollback failed: {rollback_exc}")
         jobs.update_job(job_id, status="failed", progress=100, error=str(exc))
 
 
