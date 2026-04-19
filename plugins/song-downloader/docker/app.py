@@ -219,6 +219,8 @@ def run_download_job(job_id: str) -> None:
             raise RuntimeError("Downloaded file not found after yt-dlp run")
 
         target_name = rename_to or build_target_filename(song_name, artist_names, album_name)
+        if not target_name.lower().endswith(".mp3"):
+            target_name += ".mp3"
         final_path = safe_destination((MUSIC_ROOT if auto_move else DOWNLOADS_DIR) / target_name)
 
         shutil.move(str(downloaded), str(final_path))
