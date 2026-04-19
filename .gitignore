@@ -54,3 +54,4 @@ tmp/
 # NAS / deployed app state
 mnt/
 backups/
+manifests/*.json
