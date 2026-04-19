@@ -16,6 +16,7 @@ body {
   color: var(--text);
   font-family: Inter, Arial, sans-serif;
   background: linear-gradient(180deg, #091221, #0b1424 40%, #07101a);
+  padding-bottom: 0;
 }
 button, input { font: inherit; }
 button { cursor: pointer; }
@@ -51,7 +52,7 @@ button { cursor: pointer; }
   padding: 10px 12px;
 }
 .nav-btn, .playlist-chip { width: 100%; text-align: left; }
-.nav-btn.active, .primary-btn, .icon-btn.active, .ghost-btn.active, .track-menu-btn.active {
+.nav-btn.active, .playlist-chip.active, .primary-btn, .icon-btn.active, .ghost-btn.active, .track-menu-btn.active {
   background: linear-gradient(135deg, var(--primary), #6da8ff);
   border-color: transparent;
 }
@@ -75,6 +76,7 @@ button { cursor: pointer; }
   border-radius: 999px; width: 30px; height: 30px;
 }
 .main-panel { padding: 18px; display: grid; align-content: start; gap: 14px; min-width: 0; }
+.topbar { position: sticky; top: 0; z-index: 15; border-radius: 22px; padding: 10px 12px; }
 .content-card { border-radius: 24px; padding: 18px; min-height: 220px; }
 .content-head { margin-bottom: 12px; flex-wrap: wrap; }
 .content-actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -117,6 +119,7 @@ button { cursor: pointer; }
 .player-bar {
   position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(320px, 1.2fr) minmax(280px, .8fr);
   gap: 18px; padding: 16px 18px; border-top: 1px solid var(--border); backdrop-filter: blur(8px);
+  z-index: 14;
 }
 .now-playing-card { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; align-items: start; min-width: 0; }
 .now-visual { position: relative; width: 110px; height: 110px; }
@@ -140,6 +143,7 @@ button { cursor: pointer; }
 .player-controls { display: grid; gap: 14px; align-content: center; }
 .control-row { justify-content: center; flex-wrap: wrap; }
 .seek-row input { flex: 1; }
+#seekBar { margin-bottom: 10px; touch-action: pan-x; }
 .mobile-overlay, .modal { position: fixed; inset: 0; }
 .mobile-overlay { background: rgba(0,0,0,.45); z-index: 20; }
 .modal { z-index: 40; display: grid; place-items: center; }
@@ -170,13 +174,32 @@ button { cursor: pointer; }
   .player-bar { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
-  .topbar { flex-direction: column; align-items: stretch; }
+  body { padding-bottom: 140px; }
+  .main-panel { padding: 10px; gap: 10px; }
+  .topbar { top: 0; padding: 8px; }
   .topbar-left, .topbar-actions { width: 100%; }
-  .topbar-actions { flex-wrap: wrap; }
+  .topbar-actions { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .topbar-actions > * { flex: 0 0 auto; }
   .search-wrap { min-width: 0; max-width: none; }
-  .track-row { grid-template-columns: auto minmax(0, 1fr); }
-  .track-actions { grid-column: 1 / -1; }
-  .now-playing-card { grid-template-columns: 1fr; }
+  .content-card { padding: 14px; border-radius: 20px; }
+  .track-row { grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; padding: 12px; }
+  .track-actions { grid-column: auto; }
+  .track-menu-btn { min-width: 42px; min-height: 42px; }
+  .track-subline { gap: 8px; }
+  .track-subline span:nth-child(n+4) { display: none; }
   .selection-actions, .modal-actions { width: 100%; flex-wrap: wrap; }
-  .selection-actions > *, .modal-actions > * { flex: 1 1 180px; }
+  .selection-actions > *, .modal-actions > * { flex: 1 1 140px; }
+  .player-bar { position: fixed; left: 0; right: 0; bottom: 0; grid-template-columns: 1fr; gap: 8px; padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 14px); border-radius: 18px 18px 0 0; }
+  .now-playing-card { grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; }
+  .now-visual, .now-cover, .now-cover-fallback { width: 56px; height: 56px; border-radius: 14px; }
+  .now-head-row { align-items: center; }
+  .now-title { font-size: 1rem; }
+  .now-artist { margin: 2px 0 4px; font-size: .95rem; }
+  .now-meta-line, .now-lyrics, .queue-summary { display: none; }
+  .player-controls { gap: 8px; }
+  .control-row { justify-content: flex-start; gap: 8px; }
+  .icon-btn { min-width: 44px; min-height: 44px; }
+  .seek-row { margin-top: -2px; padding: 0 4px 6px 0; }
+  .keyboard-open .player-bar { transform: translateY(120%); opacity: 0; pointer-events: none; }
+  body.keyboard-open { padding-bottom: 0; }
 }

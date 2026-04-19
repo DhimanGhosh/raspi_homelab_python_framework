@@ -14,6 +14,7 @@ let CROSSFADE_TIMER = null;
 let CROSSFADE_IN_PROGRESS = false;
 let LAST_SCHEDULED_TRACK_ID = null;
 let DUPLICATE_MODAL_STATE = null;
+let SEARCH_FOCUS_MOBILE = false;
 
 const el = (id) => document.getElementById(id);
 const audioByKey = (key) => document.getElementById(key === 'A' ? 'audioPlayerA' : 'audioPlayerB');
@@ -115,8 +116,14 @@ function applyNowPlaying(track) {
 
 function setQueueFromTracks(tracks, startId = null, doShuffle = false) {
   const ids = tracks.map((track) => track.id);
-  PLAY_QUEUE = doShuffle ? shuffleArray(ids) : ids;
-  PLAY_INDEX = startId ? Math.max(0, PLAY_QUEUE.indexOf(startId)) : 0;
+  if (doShuffle) {
+    const remaining = shuffleArray(ids.filter((id) => id !== startId));
+    PLAY_QUEUE = startId ? [startId, ...remaining] : remaining;
+    PLAY_INDEX = 0;
+  } else {
+    PLAY_QUEUE = ids;
+    PLAY_INDEX = startId ? Math.max(0, PLAY_QUEUE.indexOf(startId)) : 0;
+  }
   updateQueueSummary();
 }
 
@@ -445,10 +452,12 @@ function renderSavedPlaylists() {
   box.innerHTML = '';
   (LIBRARY?.playlists || []).forEach((playlist) => {
     const btn = document.createElement('button');
-    btn.className = 'playlist-chip';
+    const isActive = VIEW === `playlist:${playlist.name}`;
+    btn.className = `playlist-chip sidebar-playlist-btn${isActive ? ' active' : ''}`;
     btn.textContent = `${playlist.name} (${playlist.count})`;
     btn.onclick = () => {
       VIEW = `playlist:${playlist.name}`;
+      renderSavedPlaylists();
       renderCurrentView();
       closeSidebar();
     };
@@ -505,7 +514,6 @@ function renderTrackRows(items, title, meta = '') {
   items.forEach((track) => {
     const row = document.createElement('div');
     row.className = `track-row${currentQueueTrackId() === track.id ? ' active' : ''}`;
-    row.oncontextmenu = (event) => rowContextMenu(track, event);
 
     const cb = document.createElement('input');
     cb.type = 'checkbox';
@@ -535,7 +543,7 @@ function renderTrackRows(items, title, meta = '') {
     const menuBtn = document.createElement('button');
     menuBtn.className = 'track-menu-btn';
     menuBtn.textContent = '⋯';
-    menuBtn.onclick = (event) => rowContextMenu(track, event);
+    menuBtn.onclick = (event) => { event.stopPropagation(); openTrackMenu(track, menuBtn); };
     actions.appendChild(menuBtn);
 
     row.append(cb, main, actions);
@@ -544,8 +552,10 @@ function renderTrackRows(items, title, meta = '') {
 }
 
 function renderItemCards(title, meta, items, typeKey) {
+  const q = FILTER_VALUE.trim().toLowerCase();
+  const filteredItems = q ? items.filter((item) => String(item.name || '').toLowerCase().includes(q)) : items;
   el('contentTitle').textContent = title;
-  el('contentMeta').textContent = meta;
+  el('contentMeta').textContent = `${filteredItems.length} shown${q ? ` • filtered from ${items.length}` : ''}`;
   el('contentActions').innerHTML = '';
   const box = el('tracksContainer');
   box.innerHTML = '';
@@ -553,10 +563,10 @@ function renderItemCards(title, meta, items, typeKey) {
   grid.className = 'item-grid';
   const prefixes = { playlists: 'playlist:', artists: 'artist:', albums: 'album:', folders: 'folder:' };
 
-  items.forEach((item) => {
+  filteredItems.forEach((item) => {
     const card = document.createElement('div');
     card.className = 'item-card';
-    card.onclick = () => { VIEW = prefixes[typeKey] + item.name; renderCurrentView(); };
+    card.onclick = () => { VIEW = prefixes[typeKey] + item.name; renderSavedPlaylists(); renderCurrentView(); };
     card.innerHTML = `<div class="item-card-title" title="${esc(item.name)}">${esc(item.name)}</div><div class="item-card-meta">${item.count} song(s)</div>`;
     const actions = document.createElement('div');
     actions.className = 'item-card-actions';
@@ -567,6 +577,7 @@ function renderItemCards(title, meta, items, typeKey) {
     openBtn.onclick = (event) => {
       event.stopPropagation();
       VIEW = `${prefixes[typeKey]}${item.name}`;
+      renderSavedPlaylists();
       renderCurrentView();
     };
     actions.appendChild(openBtn);
@@ -598,6 +609,7 @@ function renderItemCards(title, meta, items, typeKey) {
 
 function renderCurrentView() {
   document.querySelectorAll('.nav-btn').forEach((btn) => btn.classList.toggle('active', btn.dataset.view === VIEW.split(':')[0]));
+  document.querySelectorAll('.sidebar-playlist-btn').forEach((btn) => btn.classList.remove('active'));
 
   if (VIEW === 'all') {
     const items = filterTracks(allTracks());
@@ -630,13 +642,13 @@ function renderCurrentView() {
   }
 }
 
-function rowContextMenu(track, event) {
-  event.preventDefault();
-  openContextMenu(event.clientX, event.clientY, [
+function openTrackMenu(track, anchorEl) {
+  const rect = anchorEl.getBoundingClientRect();
+  openContextMenu(rect.right - 8, rect.bottom + 8, [
     { action: 'play-next', label: 'Play next', handler: () => queueTrackNext(track.id) },
     { action: 'add-playlist', label: 'Add to playlist', handler: () => openPlaylistModal([track.id]) },
     { action: 'add-folder', label: 'Add to folder', handler: () => openFolderModal([track.id]) },
-    { action: 'go-album', label: 'Go to album', handler: () => { VIEW = `album:${track.album || 'Unknown'}`; renderCurrentView(); } },
+    { action: 'go-album', label: 'Go to album', handler: () => { VIEW = `album:${track.album || 'Unknown'}`; renderSavedPlaylists(); renderCurrentView(); } },
   ]);
 }
 
@@ -814,9 +826,6 @@ window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', (event) => {
     if (!event.target.closest('#contextMenu') && !event.target.closest('.track-menu-btn') && !event.target.closest('#nowMoreBtn')) closeContextMenu();
   });
-  document.addEventListener('contextmenu', (event) => {
-    if (!event.target.closest('.track-row')) closeContextMenu();
-  });
 
   el('menuToggle').onclick = openSidebar;
   el('closeSidebarBtn').onclick = closeSidebar;
@@ -824,6 +833,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.nav-btn').forEach((btn) => {
     btn.onclick = () => {
       VIEW = btn.dataset.view;
+      renderSavedPlaylists();
       renderCurrentView();
       closeSidebar();
     };
@@ -840,6 +850,19 @@ window.addEventListener('DOMContentLoaded', () => {
     syncSearchClear();
     renderCurrentView();
   };
+
+  el('searchInput').addEventListener('focus', () => {
+    if (window.innerWidth <= 720) {
+      SEARCH_FOCUS_MOBILE = true;
+      document.body.classList.add('keyboard-open');
+    }
+  });
+  el('searchInput').addEventListener('blur', () => {
+    window.setTimeout(() => {
+      SEARCH_FOCUS_MOBILE = false;
+      document.body.classList.remove('keyboard-open');
+    }, 120);
+  });
 
   el('refreshBtn').onclick = loadLibrary;
   el('shuffleAllBtn').onclick = () => {
@@ -908,20 +931,28 @@ window.addEventListener('DOMContentLoaded', () => {
   };
   el('shuffleToggleBtn').onclick = () => {
     SHUFFLE_ENABLED = !SHUFFLE_ENABLED;
+    const currentId = currentQueueTrackId();
+    if (SHUFFLE_ENABLED && PLAY_QUEUE.length > 1 && currentId) {
+      const remaining = shuffleArray(PLAY_QUEUE.filter((id) => id !== currentId));
+      PLAY_QUEUE = [currentId, ...remaining];
+      PLAY_INDEX = 0;
+      updateQueueSummary();
+    }
     syncToggleButtons();
   };
   el('repeatToggleBtn').onclick = () => {
     REPEAT = REPEAT === 'off' ? 'all' : (REPEAT === 'all' ? 'one' : 'off');
     syncToggleButtons();
   };
-  el('nowMoreBtn').onclick = (event) => {
+  el('nowMoreBtn').onclick = () => {
     const track = currentQueueTrack();
     if (!track) return;
-    openContextMenu(event.clientX, event.clientY, [
+    const rect = el('nowMoreBtn').getBoundingClientRect();
+    openContextMenu(rect.right - 8, rect.top - 6, [
       { action: 'np-play-next', label: 'Play next', handler: () => queueTrackNext(track.id) },
       { action: 'np-add-playlist', label: 'Add to playlist', handler: () => openPlaylistModal([track.id]) },
       { action: 'np-add-folder', label: 'Add to folder', handler: () => openFolderModal([track.id]) },
-      { action: 'np-go-album', label: 'Go to album', handler: () => { VIEW = `album:${track.album || 'Unknown'}`; renderCurrentView(); } },
+      { action: 'np-go-album', label: 'Go to album', handler: () => { VIEW = `album:${track.album || 'Unknown'}`; renderSavedPlaylists(); renderCurrentView(); } },
     ]);
   };
 

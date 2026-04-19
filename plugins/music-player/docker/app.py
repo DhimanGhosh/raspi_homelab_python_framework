@@ -23,7 +23,7 @@ APP_DATA_DIR = Path(os.getenv("APP_DATA_DIR", "/mnt/nas/homelab/runtime/music-pl
 PLAYLISTS_FILE = APP_DATA_DIR / "playlists.json"
 SETTINGS_FILE = APP_DATA_DIR / "settings.json"
 SUPPORTED_EXTENSIONS = {".mp3", ".flac", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".webm", ".oga"}
-ARTIST_SPLIT_RE = re.compile(r"\s*(?:,|/|&| feat\.? | ft\.? | featuring )\s*", re.I)
+ARTIST_SPLIT_RE = re.compile(r"\s*(?:,|，|/|&| feat\.? | ft\.? | featuring )\s*", re.I)
 IGNORE_ARTISTS = {"chorus", "others", "other", "music"}
 
 APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -45,8 +45,9 @@ def stable_track_id(rel_path: str) -> str:
 
 
 def split_artists(artists_raw: str) -> list[str]:
+    normalized = str(artists_raw or "").replace('，', ',').replace(';', ',')
     artists: list[str] = []
-    for chunk in ARTIST_SPLIT_RE.split(artists_raw or ""):
+    for chunk in ARTIST_SPLIT_RE.split(normalized):
         item = normalize_spaces(chunk)
         if item and item.lower() not in IGNORE_ARTISTS and item not in artists:
             artists.append(item)
@@ -216,7 +217,6 @@ def extract_metadata(path: Path) -> dict:
     title = _first_value(tags, ["title", "TIT2", "©nam"])
     album = _first_value(tags, ["album", "TALB", "©alb"])
     artist_value = _first_value(tags, ["artist", "albumartist", "TPE1", "TPE2", "©ART"])
-    year = _first_value(tags, ["date", "year", "TDRC", "TYER", "©day"])
 
     if title:
         metadata["title"] = title
@@ -226,9 +226,6 @@ def extract_metadata(path: Path) -> dict:
         artists = split_artists(artist_value)
         metadata["artists"] = artists or file_artists
         metadata["artist"] = ", ".join(metadata["artists"]) if metadata["artists"] else artist_value
-    if year:
-        metadata["year"] = re.findall(r"\d{4}", year)[0] if re.findall(r"\d{4}", year) else year
-
     duration = float(getattr(getattr(audio_file, "info", None), "length", 0) or 0)
     metadata["duration"] = round(duration, 2)
     minutes = int(duration // 60)
