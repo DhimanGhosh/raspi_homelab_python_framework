@@ -5,7 +5,7 @@ services:
     environment:
       PORT: "8145"
       APP_NAME: "Song Downloader"
-      APP_VERSION: "1.1.2"
+      APP_VERSION: "1.1.6"
       MUSIC_ROOT: "/mnt/nas/media/music"
       APP_DATA_DIR: "/mnt/nas/homelab/runtime/song-downloader/data"
       DOWNLOADS_DIR: "/mnt/nas/homelab/runtime/song-downloader/downloads"

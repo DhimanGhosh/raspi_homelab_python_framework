@@ -13,7 +13,7 @@
       <div class="brand-header">
         <div>
           <div class="brand-title">Music Player</div>
-          <div id="brandVersion" class="brand-version">v7.2.3</div>
+          <div id="brandVersion" class="brand-version">v7.3.4</div>
         </div>
         <button id="closeSidebarBtn" class="icon-btn sidebar-close">✕</button>
       </div>
@@ -23,6 +23,7 @@
         <button class="nav-btn" data-view="artists">Artists</button>
         <button class="nav-btn" data-view="albums">Albums</button>
         <button class="nav-btn" data-view="folders">Folders</button>
+        <button class="nav-btn" data-view="release_years">Release Years</button>
       </nav>
       <div id="currentContext" class="current-context hidden"></div>
       <div class="sidebar-section">
@@ -70,6 +71,7 @@
   </div>
 
   <footer class="player-bar" id="playerBar">
+    <div class="player-bar-clickzone" id="playerBarClickzone"></div>
     <div class="player-art-wrap">
       <img id="nowArt" class="now-art hidden" alt="Album art" />
       <div id="nowArtFallback" class="now-art-fallback">♪</div>
@@ -78,25 +80,71 @@
       <div id="nowTitle" class="now-title">Nothing playing</div>
       <div id="nowArtist" class="now-artist">Select a track</div>
       <div id="nowSource" class="now-source">playing from —</div>
-      <div id="nowAlbum" class="now-album">Album: Unknown</div>
+      <div class="now-meta-row">
+        <div id="nowAlbum" class="now-album">Album: Unknown</div>
+        <div id="nowYear" class="now-year"></div>
+      </div>
       <div id="lyricsBox" class="lyrics-box">Lyrics will appear here when available.</div>
     </div>
-    <div class="player-controls">
+    <div class="player-controls controls-sticky" id="miniControls">
       <div class="control-row">
-        <button id="prevBtn" class="icon-btn">⏮</button>
-        <button id="playPauseBtn" class="icon-btn">▶</button>
-        <button id="nextBtn" class="icon-btn">⏭</button>
-        <button id="shuffleToggleBtn" class="icon-btn">🔀</button>
-        <button id="repeatToggleBtn" class="icon-btn">Off</button>
+        <button id="prevBtn" class="icon-btn control-btn">⏮</button>
+        <button id="playPauseBtn" class="icon-btn control-btn">▶</button>
+        <button id="nextBtn" class="icon-btn control-btn">⏭</button>
+        <button id="shuffleToggleBtn" class="icon-btn control-btn">🔀</button>
+        <button id="repeatToggleBtn" class="icon-btn control-btn">Off</button>
       </div>
       <div class="seek-row">
         <span id="currentTime">0:00</span>
-        <input id="seekBar" type="range" min="0" max="0" value="0" step="0.1" />
+        <div id="seekTrack" class="seek-track" role="slider" aria-label="Seek">
+          <div id="seekFill" class="seek-fill"></div>
+          <div id="seekThumb" class="seek-thumb"></div>
+        </div>
         <span id="totalTime">0:00</span>
       </div>
       <div id="queueInfo" class="queue-info">Queue: 0 song(s)</div>
     </div>
   </footer>
+
+  <section id="nowPlayingOverlay" class="now-overlay hidden">
+    <div class="now-overlay-panel">
+      <div class="now-overlay-head">
+        <div>
+          <div class="brand-title">Now Playing</div>
+          <div id="overlaySource" class="brand-version">playing from —</div>
+        </div>
+        <button id="closeNowOverlayBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="now-overlay-body">
+        <div class="now-overlay-left">
+          <img id="overlayArt" class="overlay-art hidden" alt="Album art" />
+          <div id="overlayArtFallback" class="overlay-art overlay-art-fallback">♪</div>
+          <div id="overlayTitle" class="overlay-title">Nothing playing</div>
+          <div id="overlayArtist" class="overlay-artist">Select a track</div>
+          <div class="overlay-meta"><div id="overlayAlbum">Album: Unknown</div><div id="overlayYear"></div></div>
+          <div id="overlayLyrics" class="overlay-lyrics">Lyrics will appear here when available.</div>
+        </div>
+        <div class="now-overlay-right">
+          <div class="overlay-queue-top"><div class="overlay-queue-title">Current queue</div><div class="overlay-queue-hint">Swipe up to expand queue</div></div><div id="overlayQueueHandle" class="overlay-queue-handle" aria-hidden="true"></div>
+          <div id="overlayQueue" class="overlay-queue"></div>
+        </div>
+      </div>
+      <div class="overlay-seek-wrap">
+        <div class="control-row overlay-control-row">
+          <button id="overlayPrevBtn" class="icon-btn control-btn">⏮</button>
+          <button id="overlayPlayPauseBtn" class="icon-btn control-btn">▶</button>
+          <button id="overlayNextBtn" class="icon-btn control-btn">⏭</button>
+          <button id="overlayShuffleBtn" class="icon-btn control-btn">🔀</button>
+          <button id="overlayRepeatBtn" class="icon-btn control-btn">Off</button>
+        </div>
+        <div class="seek-row overlay-seek-row">
+          <span id="overlayCurrentTime">0:00</span>
+          <input id="overlaySeekBar" class="seek-range" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek overlay" />
+          <span id="overlayTotalTime">0:00</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <audio id="audioPlayer" preload="metadata"></audio>
 
@@ -135,11 +183,8 @@
       <div class="modal-head"><h3>Player settings</h3><button id="closeSettingsModalBtn" class="close-btn">×</button></div>
       <div class="modal-body">
         <label class="checkbox-row"><input id="transitionEnabled" type="checkbox" /><span>Enable smooth transition</span></label>
-        <label>
-          <span>Transition duration (seconds)</span>
-          <input id="transitionSeconds" class="search-input" type="number" min="0" max="10" step="0.5" />
-        </label>
-        <div class="muted-label">Transition settings are available again here. They are saved locally in the browser.</div>
+        <label><span>Transition duration (seconds)</span><input id="transitionSeconds" class="search-input" type="number" min="0" max="10" step="0.5" /></label>
+        <div class="muted-label">Transition settings are available here and saved in the browser.</div>
         <div><button id="saveSettingsBtn" class="primary-btn">Save settings</button></div>
       </div>
     </div>

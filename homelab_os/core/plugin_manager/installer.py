@@ -6,6 +6,8 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+import yaml
+
 from homelab_os.core.plugin_manager.registry import PluginRegistry
 from homelab_os.core.services.process_runner import ProcessRunner
 from homelab_os.core.services.reverse_proxy import ReverseProxyService
@@ -43,6 +45,59 @@ class PluginInstaller:
             return None
         return self.proxy.apply_plugin_route(plugin_id, int(internal_port))
 
+    def _safe_runtime_roots(self, plugin_id: str) -> list[Path]:
+        return [
+            self.settings.nas_mount / "homelab" / "runtime" / plugin_id,
+            self.settings.runtime_dir / plugin_id,
+        ]
+
+    def _is_safe_plugin_data_path(self, plugin_id: str, host_path: Path) -> bool:
+        try:
+            resolved = host_path.resolve(strict=False)
+        except Exception:
+            resolved = host_path
+        for root in self._safe_runtime_roots(plugin_id):
+            try:
+                resolved.relative_to(root.resolve(strict=False))
+                return True
+            except Exception:
+                continue
+        return False
+
+    def _collect_plugin_data_paths(self, plugin_id: str, plugin_dir: Path) -> list[Path]:
+        candidates: set[Path] = set()
+        compose_path = plugin_dir / "docker" / "docker-compose.yml"
+        if compose_path.exists():
+            try:
+                compose = yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                compose = {}
+            for service in (compose.get("services") or {}).values():
+                for volume in service.get("volumes") or []:
+                    if isinstance(volume, str):
+                        host_part = volume.split(":", 1)[0].strip()
+                        if host_part.startswith("/"):
+                            candidates.add(Path(host_part))
+        for root in self._safe_runtime_roots(plugin_id):
+            candidates.add(root)
+        return sorted(
+            [path for path in candidates if self._is_safe_plugin_data_path(plugin_id, path)],
+            key=lambda item: len(str(item)),
+            reverse=True,
+        )
+
+    def _remove_plugin_data_paths(self, plugin_id: str, plugin_dir: Path) -> None:
+        for path in self._collect_plugin_data_paths(plugin_id, plugin_dir):
+            if not path.exists():
+                continue
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                try:
+                    path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
     def _cleanup_existing_install(self, plugin_id: str) -> None:
         existing = self.registry.get_plugin(plugin_id)
         if existing:
@@ -51,6 +106,7 @@ class PluginInstaller:
             plugin_dir = self.installed_plugins_dir / plugin_id
             if plugin_dir.exists():
                 shutil.rmtree(plugin_dir, ignore_errors=True)
+            self._remove_plugin_data_paths(plugin_id, plugin_dir)
             self.state_store.remove_plugin_state(plugin_id)
             try:
                 self.proxy.remove_plugin_route(plugin_id)
@@ -117,6 +173,7 @@ class PluginInstaller:
 
         self.runner.run(["docker", "rm", "-f", plugin_id], check=False)
         self.proxy.remove_plugin_route(plugin_id)
+        self._remove_plugin_data_paths(plugin_id, plugin_dir)
 
         if plugin_dir.exists():
             shutil.rmtree(plugin_dir, ignore_errors=True)

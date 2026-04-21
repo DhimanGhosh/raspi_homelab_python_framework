@@ -14,10 +14,10 @@ function buildPayload(prefix = '') {
     artist_names: el(`${prefix}artist_names`).value.trim(),
     album_name: el(`${prefix}album_name`).value.trim(),
     youtube_url: el(`${prefix}youtube_url`).value.trim(),
-    album_art_url: el(`${prefix}album_art_url`) ? el(`${prefix}album_art_url`).value.trim() : '',
     rename_to: prefix ? '' : el('rename_to').value.trim(),
     auto_move: prefix ? true : el('auto_move').checked,
     selected_file: prefix ? el('selected_file').value : '',
+    album_art_url: prefix ? (el('retag_album_art_url')?.value.trim() || '') : (el('album_art_url')?.value.trim() || ''),
   };
 }
 
@@ -86,13 +86,13 @@ function autofillRetagFieldsFromSelection() {
 function renderLibrarySongOptions(songs, preferredValue = '') {
   const select = el('selected_file');
   const search = (el('library_song_search')?.value || '').trim().toLowerCase();
-  const filtered = songs.filter((song) => !search || song.path.toLowerCase().includes(search));
+  const filtered = songs.filter((song) => !search || song.path.toLowerCase().includes(search) || (song.name || '').toLowerCase().includes(search));
 
   select.innerHTML = '<option value=>Select a song from /mnt/nas/media/music</option>';
   filtered.forEach((song) => {
     const option = document.createElement('option');
     option.value = song.path;
-    option.textContent = song.path;
+    option.textContent = song.name || song.path;
     select.appendChild(option);
   });
 
@@ -144,7 +144,10 @@ function renderJobs(jobs) {
           <div class="job-status ${job.status}">${job.status}</div>
           <div class="job-time">${job.updated_at || job.created_at}</div>
         </div>
-        <div class="job-id">${job.id.slice(0, 8)}</div>
+        <div class="job-actions-top">
+          <div class="job-id">${job.id.slice(0, 8)}</div>
+          ${(job.status === 'running' || job.status === 'queued') ? `<button type="button" class="ghost-btn danger abort-job-btn" data-job-id="${job.id}">Abort job</button>` : ''}
+        </div>
       </div>
       <div class="job-main">
         <div><strong>Type:</strong> ${jobType}</div>
@@ -171,6 +174,17 @@ function renderJobs(jobs) {
       if (event.currentTarget.open) openLogs.add(job.id);
       else openLogs.delete(job.id);
     });
+
+    const abortBtn = card.querySelector('.abort-job-btn');
+    if (abortBtn) {
+      abortBtn.addEventListener('click', async () => {
+        abortBtn.disabled = true;
+        const res = await fetch(`/api/jobs/${job.id}/abort`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!data.ok) alert(data.error || 'Failed to abort job');
+        fetchJobs();
+      });
+    }
   });
 }
 
@@ -183,19 +197,8 @@ async function fetchJobs() {
 async function fetchLibrarySongs() {
   const res = await fetch('/api/library-songs', { cache: 'no-store' });
   const data = await res.json();
-  const select = el('selected_file');
-  const previousValue = select.value;
-  select.innerHTML = '<option value="">Select a song from /mnt/nas/media/music</option>';
-  (data.songs || []).forEach((song) => {
-    const option = document.createElement('option');
-    option.value = song.path;
-    option.textContent = song.path;
-    select.appendChild(option);
-  });
-  if (previousValue && Array.from(select.options).some((option) => option.value === previousValue)) {
-    select.value = previousValue;
-  }
-  autofillRetagFieldsFromSelection();
+  librarySongs = data.songs || [];
+  renderLibrarySongOptions(librarySongs, el('selected_file')?.value || '');
 }
 
 async function submitDownload(event) {
@@ -212,36 +215,13 @@ async function submitDownload(event) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  let data = {};
-  try { data = await res.json(); } catch (e) { data = {}; }
-  if (!res.ok || !data.ok) {
-    alert(data.error || 'Failed to queue download');
+  const data = await res.json();
+  if (!data.ok) {
+    alert('Failed to queue download');
     return;
   }
+  clearInputs(['song_name','artist_names','album_name','youtube_url','album_art_url','rename_to']);
   fetchJobs();
-}
-
-
-async function submitBatchDownload(event) {
-  event.preventDefault();
-  const jsonText = el('batch_json').value.trim();
-  if (!jsonText) {
-    alert('Paste the JSON batch payload first.');
-    return;
-  }
-  const res = await fetch('/api/download-batch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ json_text: jsonText }),
-  });
-  let data = {};
-  try { data = await res.json(); } catch (e) { data = {}; }
-  if (!res.ok || !data.ok) {
-    alert(data.error || 'Failed to queue JSON batch download');
-    return;
-  }
-  fetchJobs();
-  el('batch_json').value = '';
 }
 
 async function submitRetag(event) {
@@ -261,12 +241,13 @@ async function submitRetag(event) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  let data = {};
-  try { data = await res.json(); } catch (e) { data = {}; }
-  if (!res.ok || !data.ok) {
-    alert(data.error || 'Failed to queue retag job');
+  const data = await res.json();
+  if (!data.ok) {
+    alert('Failed to queue retag job');
     return;
   }
+  clearInputs(['selected_file','library_song_search','retag_song_name','retag_artist_names','retag_album_name','retag_youtube_url','retag_album_art_url']);
+  fetchLibrarySongs();
   fetchJobs();
 }
 
@@ -276,10 +257,17 @@ async function clearJobs() {
   fetchJobs();
 }
 
+async function abortAllJobs() {
+  const res = await fetch('/api/jobs/abort-all', { method: 'POST' });
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) return alert(data.error || 'Failed to abort all jobs');
+  fetchJobs();
+}
+
 async function refreshJobsAndClearInputs() {
   clearInputs([
     'song_name', 'artist_names', 'album_name', 'youtube_url', 'album_art_url', 'rename_to', 'batch_json',
-    'retag_song_name', 'retag_artist_names', 'retag_album_name', 'retag_youtube_url', 'retag_album_art_url', 'selected_file',
+    'retag_song_name', 'retag_artist_names', 'retag_album_name', 'retag_youtube_url', 'retag_album_art_url', 'selected_file', 'library_song_search',
   ]);
   await clearJobs();
   await fetchJobs();
@@ -289,23 +277,43 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.clear-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const target = el(btn.dataset.target);
-      if (target) target.value = '';
+      if (target) { target.value = ''; if (target.id === 'library_song_search') renderLibrarySongOptions(librarySongs, ''); if (target.id === 'selected_file') autofillRetagFieldsFromSelection(); }
     });
   });
 
   el('downloadForm').addEventListener('submit', submitDownload);
   el('retagForm').addEventListener('submit', submitRetag);
-  if (el('batchDownloadForm')) el('batchDownloadForm').addEventListener('submit', submitBatchDownload);
+  if (el('batchDownloadForm')) el('batchDownloadForm').addEventListener('submit', (e) => { e.preventDefault(); submitBatchDownload(); });
   el('refreshJobsBtn').addEventListener('click', refreshJobsAndClearInputs);
   el('clearJobsBtn').addEventListener('click', clearJobs);
+  if (el('abortAllJobsBtn')) el('abortAllJobsBtn').addEventListener('click', abortAllJobs);
   el('refreshLibraryBtn').addEventListener('click', fetchLibrarySongs);
   el('selected_file').addEventListener('change', autofillRetagFieldsFromSelection);
-  el('library_song_search').addEventListener('input', () => {
-    renderLibrarySongOptions(librarySongs, el('selected_file').value);
-  });
+  el('library_song_search').addEventListener('input', () => { renderLibrarySongOptions(librarySongs, ''); });
+  if (el('retagAllBtn')) el('retagAllBtn').addEventListener('click', submitRetagAll);
 
   fetchHealth();
   fetchJobs();
   fetchLibrarySongs();
   setInterval(fetchJobs, 1500);
 });
+
+
+async function submitBatchDownload() {
+  const raw = el('batch_json').value.trim();
+  if (!raw) return alert('Paste JSON payload first.');
+  let payload;
+  try { payload = JSON.parse(raw); } catch (err) { return alert('Invalid JSON payload'); }
+  const res = await fetch('/api/download-batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (!data.ok) return alert(data.error || 'Failed to queue multi song download');
+  clearInputs(['batch_json']);
+  fetchJobs();
+}
+
+async function submitRetagAll() {
+  const res = await fetch('/api/retag-all', { method: 'POST' });
+  const data = await res.json();
+  if (!data.ok) return alert(data.error || 'Failed to queue retag all');
+  fetchJobs();
+}

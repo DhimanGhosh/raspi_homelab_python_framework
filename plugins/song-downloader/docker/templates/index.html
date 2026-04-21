@@ -100,7 +100,7 @@
         <label class="full-width">
           <span>JSON payload</span>
           <div class="input-wrap no-clear">
-            <textarea id="batch_json" rows="10" placeholder='{"Aami Shei Manushta Aar Nei": {"ytb_link": "https://www.youtube.com/watch?v=N178XIPHHfI", "file_name": "Aami Shei Manushta Aar Nei - Dawshom Awbotaar - Anupam Roy", "album_art": "https://www.jiosaavn.com/album/dawshom-awbotaar/FEi6is4tAQ4_"}}'></textarea>
+            <textarea id="batch_json" rows="16" placeholder='{"Aami Shei Manushta Aar Nei": {"ytb_link": "https://www.youtube.com/watch?v=N178XIPHHfI", "file_name": "Aami Shei Manushta Aar Nei - Dawshom Awbotaar - Anupam Roy", "album_art": "https://www.jiosaavn.com/album/dawshom-awbotaar/FEi6is4tAQ4_"}}'></textarea>
           </div>
         </label>
         <div class="form-actions">
@@ -183,7 +183,10 @@
     <section class="jobs-card">
       <div class="jobs-header">
         <h2>Jobs</h2>
-        <button type="button" id="clearJobsBtn" class="ghost-btn danger">Clear jobs</button>
+        <div class="jobs-actions">
+          <button type="button" id="abortAllJobsBtn" class="ghost-btn danger">Abort all</button>
+          <button type="button" id="clearJobsBtn" class="ghost-btn danger">Clear jobs</button>
+        </div>
       </div>
       <div id="jobsContainer" class="jobs-container">
         <div class="empty-state">No jobs yet.</div>
