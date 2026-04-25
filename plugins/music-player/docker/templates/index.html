@@ -1,54 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Music Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>{{ app_name }}</title>
   <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
-
 <body>
   <div id="mobileOverlay" class="mobile-overlay hidden"></div>
-
-  <div class="yt-shell">
-    <aside id="sidebar" class="yt-sidebar">
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
       <div class="sidebar-top">
-        <button id="menuToggleBtn" class="icon-btn menu-toggle" type="button">☰</button>
-        <div class="yt-logo">
-          <span class="logo-dot">▶</span>
-          <span>Music</span>
+        <button id="sidebarCloseBtn" class="icon-btn sidebar-close mobile-only" type="button">✕</button>
+        <div class="app-logo-wrap">
+          <div class="app-logo"><span class="logo-dot">▶</span><span>Music</span></div>
+          <div id="logoVersion" class="app-version">v{{ app_version }}</div>
         </div>
       </div>
 
-      <nav class="yt-nav">
-        <button class="yt-nav-btn active" data-view="home" type="button"><span>🏠</span><span>Home</span></button>
-        <button class="yt-nav-btn" data-view="all" type="button"><span>🎵</span><span>All Songs</span></button>
-        <button class="yt-nav-btn" data-view="artists" type="button"><span>🎤</span><span>Artists</span></button>
-        <button class="yt-nav-btn" data-view="albums" type="button"><span>💿</span><span>Albums</span></button>
-        <button class="yt-nav-btn" data-view="playlists" type="button"><span>📚</span><span>Playlists</span></button>
-        <button class="yt-nav-btn" data-view="folders" type="button"><span>📁</span><span>Folders</span></button>
+      <nav class="nav-list">
+        <button class="nav-btn active" data-view="home" type="button"><span>🏠</span><span>Home</span></button>
+        <button class="nav-btn" data-view="all" type="button"><span>🎵</span><span>All Songs</span></button>
+        <button class="nav-btn" data-view="artists" type="button"><span>🎤</span><span>Artists</span></button>
+        <button class="nav-btn" data-view="albums" type="button"><span>💿</span><span>Albums</span></button>
+        <button class="nav-btn" data-view="playlists" type="button"><span>📚</span><span>Playlists</span></button>
+        <button class="nav-btn" data-view="folders" type="button"><span>📁</span><span>Folders</span></button>
       </nav>
 
-      <div class="sidebar-divider"></div>
+      <div class="divider"></div>
 
-      <div class="playlist-panel">
-        <div class="playlist-head">
-          <div>Saved playlists</div>
+      <section class="sidebar-playlists-block">
+        <div class="sidebar-head-row">
+          <span>Saved playlists</span>
           <button id="newPlaylistBtn" class="ghost-btn small" type="button">+ New</button>
         </div>
         <div id="sidebarPlaylists" class="sidebar-playlists"></div>
-      </div>
+      </section>
     </aside>
 
-    <main class="yt-main">
-      <header class="yt-topbar">
-        <div class="topbar-search-wrap">
+    <main class="main-area">
+      <header class="topbar">
+        <div class="search-wrap">
+          <button id="menuToggleBtn" class="icon-btn mobile-only" type="button">☰</button>
           <span class="search-icon">⌕</span>
-          <input id="searchInput" class="topbar-search" type="search"
-            placeholder="Search songs, albums, artists, folders" />
+          <input id="searchInput" class="search-input" type="text" placeholder="Search songs, albums, artists, folders" />
+          <button id="clearSearchBtn" class="icon-btn clear-search hidden" type="button" aria-label="Clear search">✕</button>
         </div>
-
         <div class="topbar-actions">
           <button id="shuffleAllBtn" class="ghost-btn" type="button">Shuffle all</button>
           <button id="refreshBtn" class="ghost-btn" type="button">Refresh</button>
@@ -61,22 +58,22 @@
     </main>
   </div>
 
-  <footer class="player-bar" id="playerBar">
-    <div class="player-now">
+  <footer id="miniPlayer" class="mini-player">
+    <div id="miniPlayerGrabber" class="mini-player-grabber mobile-only"></div>
+    <div id="miniPlayerInfo" class="mini-player-info">
       <div id="playerArt" class="player-art"><span>♪</span></div>
-      <div class="player-meta">
+      <div class="player-copy">
         <div id="playerTitle" class="player-title">Nothing playing</div>
         <div id="playerSub" class="player-sub">Select a track to start playback</div>
       </div>
     </div>
 
-    <div class="player-center">
+    <div class="mini-player-center">
       <div class="player-controls">
         <button id="prevBtn" class="icon-btn" type="button">⏮</button>
         <button id="playPauseBtn" class="icon-btn play-btn" type="button">▶</button>
         <button id="nextBtn" class="icon-btn" type="button">⏭</button>
       </div>
-
       <div class="seek-row">
         <span id="timeCurrent">0:00</span>
         <input id="seekRange" class="seek-range" type="range" min="0" max="1000" value="0" />
@@ -91,30 +88,131 @@
     </div>
   </footer>
 
-  <div id="queueDrawer" class="queue-drawer hidden">
-    <div class="queue-drawer-panel">
-      <div class="queue-drawer-head">
-        <div>
-          <div class="queue-title">Current queue</div>
-          <div id="queueSubtitle" class="queue-subtitle">0 song(s)</div>
+  <section id="nowPlayingOverlay" class="now-playing-overlay hidden">
+    <div id="nowPlayingPanel" class="now-playing-panel">
+      <div class="now-playing-header">
+        <button id="closeNowPlayingBtn" class="icon-btn" type="button">⌄</button>
+        <div class="now-playing-header-copy">
+          <div>Now playing</div>
+          <div id="nowPlayingContext" class="muted">Local library</div>
         </div>
-        <button id="closeQueueBtn" class="icon-btn" type="button">✕</button>
+        <button id="overlayOptionsBtn" class="icon-btn" type="button">⋯</button>
       </div>
-      <div id="queueList" class="queue-list"></div>
+
+      <div class="now-playing-main">
+        <div class="now-playing-art-wrap">
+          <div id="overlayArt" class="overlay-art"><span>♪</span></div>
+        </div>
+        <div class="now-playing-copy">
+          <div id="overlayTitle" class="overlay-title">Nothing playing</div>
+          <div id="overlaySub" class="overlay-sub">Select a track to start playback</div>
+        </div>
+        <div class="seek-row overlay-seek-row">
+          <span id="overlayTimeCurrent">0:00</span>
+          <input id="overlaySeekRange" class="seek-range" type="range" min="0" max="1000" value="0" />
+          <span id="overlayTimeTotal">0:00</span>
+        </div>
+        <div class="overlay-controls-row">
+          <button id="overlayShuffleBtn" class="icon-btn big" type="button">🔀</button>
+          <button id="overlayPrevBtn" class="icon-btn big" type="button">⏮</button>
+          <button id="overlayPlayPauseBtn" class="icon-btn hero-play-btn" type="button">▶</button>
+          <button id="overlayNextBtn" class="icon-btn big" type="button">⏭</button>
+          <button id="overlayRepeatBtn" class="icon-btn big" type="button">Off</button>
+        </div>
+      </div>
+
+      <div id="overlayQueueHandle" class="overlay-queue-handle">
+        <span class="queue-handle-bar"></span>
+        <span>Swipe up for queue</span>
+      </div>
+
+      <div id="overlayQueueSheet" class="overlay-queue-sheet">
+        <div id="queueSheetHead" class="queue-sheet-head">
+          <div>
+            <div class="queue-title">Current queue</div>
+            <div id="queueSubtitle" class="muted">0 song(s)</div>
+          </div>
+        </div>
+        <div id="queueList" class="queue-list"></div>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <div id="trackMenu" class="menu-pop hidden"></div>
 
   <div id="playlistModal" class="modal hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-dialog">
+    <div class="modal-dialog wide-dialog">
       <div class="modal-head">
-        <h3>Create playlist</h3>
+        <h3>Add to playlist</h3>
         <button id="closePlaylistModalBtn" class="icon-btn" type="button">✕</button>
       </div>
       <div class="modal-body">
-        <input id="playlistNameInput" class="text-input" type="text" placeholder="Playlist name" />
+        <div class="field-wrap">
+          <label class="field-label">Existing playlists</label>
+          <div id="playlistSelectionList" class="playlist-selection-list"></div>
+        </div>
+        <div class="field-wrap">
+          <label class="field-label" for="playlistNameInput">Create playlist</label>
+          <input id="playlistNameInput" class="text-input" type="text" placeholder="Enter playlist name" />
+        </div>
         <div class="modal-actions">
-          <button id="createPlaylistConfirmBtn" class="ghost-btn" type="button">Create</button>
+          <button id="createPlaylistConfirmBtn" class="ghost-btn" type="button">Save selection</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="duplicateModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3>Duplicate tracks found</h3>
+        <button id="closeDuplicateModalBtn" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="duplicateText" class="muted"></p>
+        <div class="modal-actions dual-actions">
+          <button id="skipDuplicatesBtn" class="ghost-btn" type="button">Skip duplicates</button>
+          <button id="addDuplicatesBtn" class="ghost-btn primary" type="button">Add anyway</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="metadataModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog wide-dialog">
+      <div class="modal-head">
+        <h3>Edit MP3 metadata</h3>
+        <button id="closeMetadataModalBtn" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-wrap"><label class="field-label" for="metaTitle">Title</label><input id="metaTitle" class="text-input" type="text" /></div>
+        <div class="field-wrap"><label class="field-label" for="metaArtist">Artists (comma separated)</label><input id="metaArtist" class="text-input" type="text" /></div>
+        <div class="field-wrap"><label class="field-label" for="metaAlbum">Album</label><input id="metaAlbum" class="text-input" type="text" /></div>
+        <div class="field-wrap"><label class="field-label" for="metaYear">Release Year</label><input id="metaYear" class="text-input" type="text" maxlength="4" /></div>
+        <div class="field-wrap"><label class="field-label" for="metaArtLink">Album Art Link</label><input id="metaArtLink" class="text-input" type="url" placeholder="https://..." /></div>
+        <div class="field-wrap"><label class="field-label" for="metaArtFile">Upload Album Art (square image file)</label><input id="metaArtFile" class="text-input file-input" type="file" accept="image/*" /></div>
+        <div class="modal-actions">
+          <button id="saveMetadataBtn" class="ghost-btn primary" type="button">Save metadata</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="artistImageModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog wide-dialog">
+      <div class="modal-head">
+        <h3>Add artist image</h3>
+        <button id="closeArtistImageModalBtn" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-wrap"><label class="field-label" for="artistImageLink">Artist image link</label><input id="artistImageLink" class="text-input" type="url" placeholder="https://..." /></div>
+        <div class="field-wrap"><label class="field-label" for="artistImageFile">Upload artist image</label><input id="artistImageFile" class="text-input file-input" type="file" accept="image/*" /></div>
+        <div class="modal-actions">
+          <button id="saveArtistImageBtn" class="ghost-btn primary" type="button">Save artist image</button>
         </div>
       </div>
     </div>
@@ -122,5 +220,4 @@
 
   <script src="/static/js/script.js"></script>
 </body>
-
 </html>

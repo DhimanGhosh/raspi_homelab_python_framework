@@ -1,7 +1,7 @@
 {
   "id": "music-player",
   "name": "Music Player",
-  "version": "8.2.0",
+  "version": "8.4.0",
   "runtime_type": "docker",
   "network": {
     "internal_port": 8140,

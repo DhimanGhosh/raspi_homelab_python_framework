@@ -19,16 +19,15 @@ from flask import Flask, jsonify, request, send_from_directory
 APP_NAME = os.getenv("APP_NAME", "Song Downloader")
 PLUGIN_JSON = Path(__file__).resolve().parents[1] / "plugin.json"
 try:
-    APP_VERSION = json.loads(PLUGIN_JSON.read_text(encoding="utf-8")).get("version", os.getenv("APP_VERSION", "1.3.1"))
+    APP_VERSION = json.loads(PLUGIN_JSON.read_text(encoding="utf-8")).get("version", os.getenv("APP_VERSION", "1.3.2"))
 except Exception:
-    APP_VERSION = os.getenv("APP_VERSION", "1.3.1")
+    APP_VERSION = os.getenv("APP_VERSION", "1.3.2")
 PORT = int(os.getenv("PORT", "8145"))
 MUSIC_ROOT = Path(os.getenv("MUSIC_ROOT", "/mnt/nas/media/music")).resolve()
 APP_DATA_DIR = Path(os.getenv("APP_DATA_DIR", "/mnt/nas/homelab/runtime/song-downloader/data")).resolve()
 DOWNLOADS_DIR = Path(os.getenv("DOWNLOADS_DIR", "/mnt/nas/homelab/runtime/song-downloader/downloads")).resolve()
 JOBS_FILE = APP_DATA_DIR / "jobs.json"
 DEFAULT_COOKIES_FILE = APP_DATA_DIR / "cookies.txt"
-DENO_BIN = Path(os.getenv("DENO_BIN", "/usr/local/bin/deno")).resolve()
 
 APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -301,8 +300,18 @@ def yt_dlp_base_cmd(payload: dict | None = None) -> list[str]:
     cmd = [
         "yt-dlp",
         "--no-playlist",
-        "--js-runtimes",
-        f"deno:{DENO_BIN}",
+        "--extractor-args",
+        "youtube:player_client=android,web",
+        "--sleep-requests",
+        "1",
+        "--sleep-interval",
+        "2",
+        "--max-sleep-interval",
+        "5",
+        "--retries",
+        "3",
+        "--fragment-retries",
+        "3",
     ]
     cookies_file = resolve_cookies_file(payload)
     if cookies_file:
@@ -316,7 +325,7 @@ def log_yt_dlp_runtime(job_id: str, payload: dict) -> None:
         append_log(job_id, f"Using cookies file: {cookies_file}")
     else:
         append_log(job_id, f"No cookies file found. Auto path checked: {DEFAULT_COOKIES_FILE}")
-    append_log(job_id, f"Using JS runtime: deno ({DENO_BIN})")
+    append_log(job_id, "Using stable yt-dlp mode (no deno runtime)")
 
 def _extract_progress_percent(line: str) -> int | None:
     match = re.search(r'\[download\]\s+(\d+(?:\.\d+)?)%', line)
@@ -755,7 +764,7 @@ def health():
         "downloads_dir": str(DOWNLOADS_DIR),
         "auto_cookies_path": str(DEFAULT_COOKIES_FILE),
         "auto_cookies_present": DEFAULT_COOKIES_FILE.exists(),
-        "deno_bin": str(DENO_BIN),
+        "yt_dlp_mode": "stable-no-deno",
     })
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
