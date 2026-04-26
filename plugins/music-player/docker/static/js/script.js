@@ -21,7 +21,8 @@ const S = {
   queueOriginIds: [],
   queueOriginLabel: 'Local library',
   queueOriginType: 'tracks',
-  autoQueueMode: false,
+  userInitiatedPlayback: false,
+  booting: true,
   dragTouch: null,
 };
 
@@ -131,7 +132,31 @@ function updateQueueOrigin(trackIds, label = 'Local library', type = 'tracks') {
   S.queueOriginType = type;
 }
 
+function canAutoplay(autoplay) {
+  // Only explicit playback controls are allowed to start audio.
+  // Navigation clicks such as Home/Artists/Albums create browser user activation,
+  // so relying on navigator.userActivation caused Home to navigate and start songs.
+  return !!autoplay && !S.booting && S.userInitiatedPlayback === true;
+}
+
+function hardStopStartupPlayback() {
+  try { audio.pause(); } catch (error) { }
+  try { audio.removeAttribute('src'); audio.load(); } catch (error) { }
+  S.queue = [];
+  S.index = -1;
+  S.autoQueueMode = false;
+  S.userInitiatedPlayback = false;
+}
+
 function setQueue(trackIds, startIndex = 0, autoplay = true, contextLabel = 'Local library', options = {}) {
+  // Navigation/render clicks must never create a current song.
+  // Only an explicit playback action sets S.userInitiatedPlayback before calling setQueue().
+  // This prevents Home / All Songs / refresh from selecting the first library item in
+  // the footer or opening a huge queue while the player is still in "Nothing playing" state.
+  if (autoplay && !S.userInitiatedPlayback) {
+    return;
+  }
+
   const ids = uniqueIds(trackIds);
   if (options.storeOrigin !== false) {
     updateQueueOrigin(ids, contextLabel, options.originType || S.context?.type || 'tracks');
@@ -149,11 +174,15 @@ function setQueue(trackIds, startIndex = 0, autoplay = true, contextLabel = 'Loc
   }
 }
 
+
 function insertPlayNext(trackIds) {
   const items = buildTrackList(uniqueIds(trackIds));
   if (!items.length) return;
   if (S.index < 0 || !S.queue.length) {
-    setQueue(items.map((track) => track.id), 0, true, 'Queued songs', { storeOrigin: false });
+    S.queue = items;
+    S.index = -1;
+    renderQueue();
+    updatePlayer();
     return;
   }
   const insertAt = S.index + 1;
@@ -167,7 +196,10 @@ function appendToQueue(trackIds) {
   const items = buildTrackList(uniqueIds(trackIds));
   if (!items.length) return;
   if (S.index < 0 || !S.queue.length) {
-    setQueue(items.map((track) => track.id), 0, true, 'Queued songs', { storeOrigin: false });
+    S.queue = items;
+    S.index = -1;
+    renderQueue();
+    updatePlayer();
     return;
   }
   const idsInQueue = new Set(S.queue.map((track) => track.id));
@@ -226,7 +258,7 @@ function loadCurrent(autoplay = true) {
   if (!track) return;
   audio.src = track.stream_url;
   audio.load();
-  if (autoplay) audio.play().catch(() => null);
+  if (canAutoplay(autoplay)) audio.play().catch(() => null);
   updatePlayer();
   renderQueue();
 }
@@ -294,6 +326,7 @@ function updatePlayer() {
 }
 
 function togglePlayPause() {
+  S.userInitiatedPlayback = true;
   if (!currentTrack() && S.lib.tracks.length) {
     setQueue(S.lib.tracks.map((track) => track.id), 0, true, 'All songs', { originType: 'tracks' });
     return;
@@ -304,6 +337,7 @@ function togglePlayPause() {
 }
 
 function nextTrack() {
+  S.userInitiatedPlayback = true;
   if (!S.queue.length) return;
   if (S.index < S.queue.length - 1) {
     S.index += 1;
@@ -328,6 +362,7 @@ function nextTrack() {
 }
 
 function prevTrack() {
+  S.userInitiatedPlayback = true;
   if (!S.queue.length) return;
   if (audio.currentTime > 4) {
     audio.currentTime = 0;
@@ -369,12 +404,13 @@ function renderSidebarPlaylists() {
 }
 
 function collectionActions(type, value, extra = {}) {
+  const compactHome = extra.home === true;
   return `
-    <div class="section-actions">
+    <div class="section-actions ${compactHome ? 'home-actions' : ''}">
       <button class="ghost-btn js-play-group" data-type="${type}" data-value="${escapeHtml(value)}">Play all</button>
       <button class="ghost-btn js-shuffle-group" data-type="${type}" data-value="${escapeHtml(value)}">Shuffle</button>
-      <button class="ghost-btn js-playnext-group" data-type="${type}" data-value="${escapeHtml(value)}">Play next</button>
-      <button class="ghost-btn js-addqueue-group" data-type="${type}" data-value="${escapeHtml(value)}">Add to queue</button>
+      ${compactHome ? '' : `<button class="ghost-btn js-playnext-group" data-type="${type}" data-value="${escapeHtml(value)}">Play next</button>`}
+      ${compactHome ? '' : `<button class="ghost-btn js-addqueue-group" data-type="${type}" data-value="${escapeHtml(value)}">Add to queue</button>`}
       ${extra.menu ? `<button class="icon-btn js-open-group-menu" data-type="${type}" data-value="${escapeHtml(value)}">⋯</button>` : ''}
     </div>
   `;
@@ -383,12 +419,14 @@ function collectionActions(type, value, extra = {}) {
 function attachCollectionActionHandlers() {
   document.querySelectorAll('.js-play-group').forEach((btn) => {
     btn.onclick = () => {
+      S.userInitiatedPlayback = true;
       const ids = resolveCollectionIds(btn.dataset.type, btn.dataset.value);
       setQueue(ids, 0, true, btn.dataset.value, { originType: btn.dataset.type });
     };
   });
   document.querySelectorAll('.js-shuffle-group').forEach((btn) => {
     btn.onclick = () => {
+      S.userInitiatedPlayback = true;
       const originIds = resolveCollectionIds(btn.dataset.type, btn.dataset.value);
       setQueue(shuffledIds(originIds), 0, true, btn.dataset.value, { originType: btn.dataset.type });
     };
@@ -451,14 +489,14 @@ function renderHomeView() {
           <h2 class="section-title">Listen again</h2>
           <div class="section-sub">Local library picks</div>
         </div>
-        ${collectionActions('tracks', 'All songs')}
+        ${collectionActions('tracks', 'All songs', { home: true })}
       </div>
       <div class="media-row">
         ${heroTracks.map((track) => `
           <article class="media-card" data-track-id="${escapeHtml(track.id)}">
             <div class="media-art">
               ${artMarkup(track.art_url)}
-              <div class="play-overlay">▶</div>
+              <button class="play-overlay js-home-card-play" data-track-id="${escapeHtml(track.id)}" type="button" aria-label="Play ${escapeHtml(track.title)}">▶</button>
             </div>
             <div class="media-title">${escapeHtml(track.title)}</div>
             <div class="media-meta">${escapeHtml(track.artist)}</div>
@@ -558,17 +596,12 @@ function renderView() {
 }
 
 function renderChips() {
-  const chips = [
-    { id: 'home', label: 'All', view: 'home' },
-    { id: 'artists', label: 'Artists', view: 'artists' },
-    { id: 'albums', label: 'Albums', view: 'albums' },
-    { id: 'playlists', label: 'Playlists', view: 'playlists' },
-    { id: 'folders', label: 'Folders', view: 'folders' },
-  ];
-  $('chipsBar').innerHTML = chips.map((chip) => `<button class="chip ${S.view === chip.view ? 'active' : ''}" data-chip-view="${chip.view}">${chip.label}</button>`).join('');
-  $('chipsBar').querySelectorAll('[data-chip-view]').forEach((btn) => {
-    btn.onclick = () => navigate(btn.dataset.chipView);
-  });
+  // Category chips are intentionally removed on both desktop and mobile.
+  // The same navigation is available from the sidebar/hamburger menu.
+  const chipsBar = $('chipsBar');
+  if (!chipsBar) return;
+  chipsBar.innerHTML = '';
+  chipsBar.classList.add('hidden');
 }
 
 function navigate(view, context = null) {
@@ -589,11 +622,13 @@ function attachGeneralHandlers() {
     if (node.classList.contains('queue-item')) return;
     node.onclick = (event) => {
       if (event.target.closest('.js-track-menu') || event.target.closest('.js-playnext-single') || event.target.closest('.js-addqueue-single')) return;
-      const listRoot = node.closest('.list-section');
-      const sourceNodes = Array.from(listRoot?.querySelectorAll('[data-track-id]') || []).filter((item) => !item.classList.contains('queue-item'));
-      const ids = sourceNodes.map((item) => item.dataset.trackId);
+      const homeCard = node.classList.contains('media-card') || !!node.closest('.media-card');
+      const listRoot = node.closest('.list-section') || node.closest('.media-row');
+      const sourceNodes = Array.from(listRoot?.querySelectorAll('[data-track-id]') || []).filter((item) => !item.classList.contains('queue-item') && !item.classList.contains('js-home-card-play'));
+      const ids = uniqueIds(sourceNodes.map((item) => item.dataset.trackId));
       const index = ids.indexOf(node.dataset.trackId);
-      setQueue(ids, Math.max(0, index), true, S.context?.value || currentContextLabel(), { originType: S.context?.type || 'tracks' });
+      S.userInitiatedPlayback = true;
+      setQueue(ids.length ? ids : [node.dataset.trackId], Math.max(0, index), true, homeCard ? 'Local library' : (S.context?.value || currentContextLabel()), { originType: homeCard ? 'tracks' : (S.context?.type || 'tracks') });
     };
   });
   document.querySelectorAll('.js-track-menu').forEach((btn) => {
@@ -684,8 +719,8 @@ function bindMenuActions() {
       }
       if (payload.kind === 'group') {
         const ids = resolveCollectionIds(payload.type, payload.value);
-        if (action === 'playall') setQueue(ids, 0, true, payload.value, { originType: payload.type });
-        if (action === 'shuffle') setQueue(shuffledIds(ids), 0, true, payload.value, { originType: payload.type });
+        if (action === 'playall') { S.userInitiatedPlayback = true; setQueue(ids, 0, true, payload.value, { originType: payload.type }); }
+        if (action === 'shuffle') { S.userInitiatedPlayback = true; setQueue(shuffledIds(ids), 0, true, payload.value, { originType: payload.type }); }
         if (action === 'playnext-group') insertPlayNext(ids);
         if (action === 'addqueue-group') appendToQueue(ids);
         if (action === 'playlist-group') openPlaylistModal(ids);
@@ -828,6 +863,7 @@ function renderQueue() {
   $('queueList').querySelectorAll('.queue-item').forEach((item) => {
     item.onclick = (event) => {
       if (event.target.closest('.drag-handle') || event.target.closest('.js-queue-item-menu')) return;
+      S.userInitiatedPlayback = true;
       S.index = Number(item.dataset.queueIndex);
       loadCurrent();
     };
@@ -909,8 +945,16 @@ async function loadLibrary() {
 }
 
 async function initialLoad() {
+  hardStopStartupPlayback();
   await loadLibrary();
+  hardStopStartupPlayback();
+  S.booting = false;
+  updatePlayer();
+  renderQueue();
 }
+
+window.addEventListener('pagehide', hardStopStartupPlayback);
+window.addEventListener('beforeunload', hardStopStartupPlayback);
 
 function bindSwipeGestures() {
   const overlay = $('nowPlayingOverlay');
@@ -961,7 +1005,7 @@ function wireGlobalEvents() {
     renderView();
   };
   $('refreshBtn').onclick = () => loadLibrary();
-  $('shuffleAllBtn').onclick = () => setQueue(shuffledIds(S.lib.tracks.map((track) => track.id)), 0, true, 'All songs', { originType: 'tracks' });
+  $('shuffleAllBtn').onclick = () => { S.userInitiatedPlayback = true; setQueue(shuffledIds(S.lib.tracks.map((track) => track.id)), 0, true, 'All songs', { originType: 'tracks' }); };
   $('newPlaylistBtn').onclick = () => openPlaylistModal([]);
   $('closePlaylistModalBtn').onclick = () => $('playlistModal').classList.add('hidden');
   $('createPlaylistConfirmBtn').onclick = () => savePlaylistSelection(false);
@@ -983,10 +1027,10 @@ function wireGlobalEvents() {
     if (!$('trackMenu').contains(event.target) && !event.target.closest('.js-track-menu') && !event.target.closest('.js-open-group-menu') && !event.target.closest('.js-queue-item-menu') && event.target !== $('overlayOptionsBtn')) closeMenu();
   });
 
-  $('miniPlayerInfo').onclick = () => toggleNowPlaying(true);
-  $('miniPlayerGrabber').onclick = () => toggleNowPlaying(true);
+  $('miniPlayerInfo').onclick = () => { if (currentTrack()) toggleNowPlaying(true); };
+  $('miniPlayerGrabber').onclick = () => { if (currentTrack()) toggleNowPlaying(true); };
   $('closeNowPlayingBtn').onclick = () => toggleNowPlaying(false);
-  $('queueBtn').onclick = () => toggleNowPlaying(true);
+  $('queueBtn').onclick = () => { if (currentTrack()) toggleNowPlaying(true); };
   $('overlayQueueHandle').onclick = () => toggleQueueSheet();
   $('overlayOptionsBtn').onclick = (event) => {
     const track = currentTrack();

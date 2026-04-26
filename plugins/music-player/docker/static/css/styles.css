@@ -859,3 +859,45 @@ a { color: inherit; }
   .entity-count, .media-meta { font-size: .85rem; }
   .artist-actions .section-actions { justify-content:flex-start; }
 }
+
+/* v8.4.1 patch: keep the mobile sidebar above every app layer. */
+@media (max-width: 920px) {
+  .mobile-overlay {
+    z-index: 9990 !important;
+  }
+  .sidebar {
+    z-index: 10000 !important;
+  }
+  .sidebar.open {
+    z-index: 10001 !important;
+  }
+  .sidebar.open ~ .main-area,
+  body:has(.sidebar.open) .mini-player,
+  body:has(.sidebar.open) .now-playing-overlay,
+  body:has(.sidebar.open) .menu-pop {
+    pointer-events: none;
+  }
+  body:has(.sidebar.open) .sidebar {
+    pointer-events: auto;
+  }
+}
+
+/* v8.4.5: remove duplicate category chip navigation on all screen sizes. */
+.chips-bar, #chipsBar { display: none !important; }
+
+/* v8.4.6: Home screen keeps only Play all/Shuffle and makes card play overlay reliably clickable. */
+.home-actions .js-playnext-group,
+.home-actions .js-addqueue-group {
+  display: none !important;
+}
+.media-card .play-overlay {
+  border: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.media-card .play-overlay:active {
+  transform: scale(0.96);
+}
