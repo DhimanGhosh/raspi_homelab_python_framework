@@ -23,6 +23,8 @@ const S = {
   queueOriginType: 'tracks',
   userInitiatedPlayback: false,
   booting: true,
+  playStats: { songs: {}, albums: {}, artists: {} },
+  lastCountedTrackId: null,
   dragTouch: null,
 };
 
@@ -69,6 +71,67 @@ function averageYear(tracks) {
 
 function trackById(id) {
   return (S.lib.tracks || []).find((track) => track.id === id) || null;
+}
+
+const PLAY_STATS_KEY = 'musicPlayer.playStats.v1';
+
+function loadPlayStats() {
+  try {
+    const data = JSON.parse(localStorage.getItem(PLAY_STATS_KEY) || '{}');
+    S.playStats = {
+      songs: data.songs || {},
+      albums: data.albums || {},
+      artists: data.artists || {},
+    };
+  } catch (error) {
+    S.playStats = { songs: {}, albums: {}, artists: {} };
+  }
+}
+
+function savePlayStats() {
+  try { localStorage.setItem(PLAY_STATS_KEY, JSON.stringify(S.playStats)); } catch (error) { }
+}
+
+function splitArtists(value = '') {
+  return String(value || '')
+    .split(/[,，&]+/)
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function bumpCounter(bucket, key) {
+  if (!key) return;
+  S.playStats[bucket][key] = (Number(S.playStats[bucket][key]) || 0) + 1;
+}
+
+function countPlayedTrack(track) {
+  if (!track || S.lastCountedTrackId === track.id) return;
+  S.lastCountedTrackId = track.id;
+  bumpCounter('songs', track.id);
+  bumpCounter('albums', track.album || 'Unknown Album');
+  splitArtists(track.artist || 'Unknown Artist').forEach((artist) => bumpCounter('artists', artist));
+  savePlayStats();
+  if (S.view === 'home') renderHomeView();
+}
+
+function itemPlayCount(item, type) {
+  if (type === 'albums') return Number(S.playStats.albums[item.name]) || 0;
+  if (type === 'artists') return Number(S.playStats.artists[item.name]) || 0;
+  return 0;
+}
+
+function sortByPlayedThenName(items, type) {
+  return [...items].sort((a, b) => {
+    const played = itemPlayCount(b, type) - itemPlayCount(a, type);
+    return played || String(a.name || '').localeCompare(String(b.name || ''));
+  });
+}
+
+function sortTracksByPlayed(tracks) {
+  return [...tracks].sort((a, b) => {
+    const played = (Number(S.playStats.songs[b.id]) || 0) - (Number(S.playStats.songs[a.id]) || 0);
+    return played || String(a.title || '').localeCompare(String(b.title || ''));
+  });
 }
 
 function artMarkup(url, cls = 'fallback') {
@@ -256,6 +319,7 @@ function appendSmartBatch(force = false) {
 function loadCurrent(autoplay = true) {
   const track = currentTrack();
   if (!track) return;
+  S.lastCountedTrackId = null;
   audio.src = track.stream_url;
   audio.load();
   if (canAutoplay(autoplay)) audio.play().catch(() => null);
@@ -269,8 +333,10 @@ function applyNowPlayingTheme(track) {
   const fallback = 'linear-gradient(135deg, rgba(26,26,28,.96), rgba(5,5,5,.98))';
   if (!track?.art_url) {
     overlay.style.setProperty('--overlay-bg', fallback);
+    overlay.style.removeProperty('--overlay-art-bg');
     return;
   }
+  overlay.style.setProperty('--overlay-art-bg', `url("${track.art_url}")`);
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
@@ -375,18 +441,60 @@ function prevTrack() {
 }
 
 function toggleQueueSheet(open) {
+  // v8.4.22: queue is integrated into the now-playing scroll page.
   const sheet = $('overlayQueueSheet');
-  const shouldOpen = open ?? !sheet.classList.contains('open');
-  sheet.classList.toggle('open', shouldOpen);
+  if (sheet) sheet.classList.add('open');
 }
+
+let nowPlayingScrollRaf = 0;
+
+function applyNowPlayingScrollProgress() {
+  nowPlayingScrollRaf = 0;
+  const panel = $('nowPlayingPanel');
+  const main = document.querySelector('.now-playing-main');
+  if (!panel) return;
+
+  const isMobile = window.matchMedia('(max-width: 900px)').matches;
+  const stickyOffset = isMobile ? 60 : 62;
+  const compactHeight = isMobile ? 260 : 310;
+  const fullHeight = Math.max(isMobile ? 520 : 430, panel.clientHeight - (isMobile ? 104 : 116));
+  const collapseDistance = isMobile ? 420 : 520;
+  const progress = Math.max(0, Math.min(1, panel.scrollTop / collapseDistance));
+
+  const height = Math.round(fullHeight - ((fullHeight - compactHeight) * progress));
+  panel.style.setProperty('--np-scroll', String(progress));
+  panel.style.setProperty('--np-main-height', `${height}px`);
+  panel.style.setProperty('--np-compact-main-height', `${compactHeight}px`);
+  panel.style.setProperty('--np-sticky-offset', `${stickyOffset}px`);
+
+  const shouldBeScrolled = progress > 0.08;
+  panel.classList.toggle('is-scrolled', shouldBeScrolled);
+  if (main) main.style.setProperty('--np-local-height', `${height}px`);
+}
+
+function updateNowPlayingScrollProgress() {
+  if (nowPlayingScrollRaf) return;
+  nowPlayingScrollRaf = requestAnimationFrame(applyNowPlayingScrollProgress);
+}
+
 
 function toggleNowPlaying(open) {
   const overlay = $('nowPlayingOverlay');
   const shouldOpen = open ?? overlay.classList.contains('hidden');
   overlay.classList.toggle('hidden', !shouldOpen);
-  if (!shouldOpen) toggleQueueSheet(false);
-  if (window.innerWidth >= 901 && shouldOpen) toggleQueueSheet(true);
+  if (shouldOpen) {
+    const panel = $('nowPlayingPanel');
+    if (panel) {
+      panel.scrollTop = 0;
+      panel.classList.remove('is-scrolled');
+      const sheet = $('overlayQueueSheet');
+      if (sheet) sheet.style.setProperty('--queue-safe-pad', '0px');
+    }
+    toggleQueueSheet(true);
+    requestAnimationFrame(updateNowPlayingScrollProgress);
+  }
 }
+
 
 function renderSidebarPlaylists() {
   const container = $('sidebarPlaylists');
@@ -405,12 +513,13 @@ function renderSidebarPlaylists() {
 
 function collectionActions(type, value, extra = {}) {
   const compactHome = extra.home === true;
+  const menuOnly = extra.menuOnly === true;
   return `
     <div class="section-actions ${compactHome ? 'home-actions' : ''}">
-      <button class="ghost-btn js-play-group" data-type="${type}" data-value="${escapeHtml(value)}">Play all</button>
-      <button class="ghost-btn js-shuffle-group" data-type="${type}" data-value="${escapeHtml(value)}">Shuffle</button>
-      ${compactHome ? '' : `<button class="ghost-btn js-playnext-group" data-type="${type}" data-value="${escapeHtml(value)}">Play next</button>`}
-      ${compactHome ? '' : `<button class="ghost-btn js-addqueue-group" data-type="${type}" data-value="${escapeHtml(value)}">Add to queue</button>`}
+      ${menuOnly ? '' : `<button class="ghost-btn js-play-group" data-type="${type}" data-value="${escapeHtml(value)}">Play all</button>`}
+      ${menuOnly ? '' : `<button class="ghost-btn js-shuffle-group" data-type="${type}" data-value="${escapeHtml(value)}">Shuffle</button>`}
+      ${compactHome || menuOnly ? '' : `<button class="ghost-btn js-playnext-group" data-type="${type}" data-value="${escapeHtml(value)}">Play next</button>`}
+      ${compactHome || menuOnly ? '' : `<button class="ghost-btn js-addqueue-group" data-type="${type}" data-value="${escapeHtml(value)}">Add to queue</button>`}
       ${extra.menu ? `<button class="icon-btn js-open-group-menu" data-type="${type}" data-value="${escapeHtml(value)}">⋯</button>` : ''}
     </div>
   `;
@@ -431,10 +540,14 @@ function attachCollectionActionHandlers() {
       setQueue(shuffledIds(originIds), 0, true, btn.dataset.value, { originType: btn.dataset.type });
     };
   });
-  document.querySelectorAll('.js-playnext-group').forEach((btn) => insertPlayNext(resolveCollectionIds(btn.dataset.type, btn.dataset.value)));
-  document.querySelectorAll('.js-addqueue-group').forEach((btn) => appendToQueue(resolveCollectionIds(btn.dataset.type, btn.dataset.value)));
+  document.querySelectorAll('.js-playnext-group').forEach((btn) => {
+    btn.onclick = (event) => { event.stopPropagation(); insertPlayNext(resolveCollectionIds(btn.dataset.type, btn.dataset.value)); };
+  });
+  document.querySelectorAll('.js-addqueue-group').forEach((btn) => {
+    btn.onclick = (event) => { event.stopPropagation(); appendToQueue(resolveCollectionIds(btn.dataset.type, btn.dataset.value)); };
+  });
   document.querySelectorAll('.js-open-group-menu').forEach((btn) => {
-    btn.onclick = (event) => openGroupMenu(event.currentTarget, btn.dataset.type, btn.dataset.value);
+    btn.onclick = (event) => { event.stopPropagation(); openGroupMenu(event.currentTarget, btn.dataset.type, btn.dataset.value); };
   });
 }
 
@@ -478,9 +591,9 @@ function renderTrackRow(track, extra = {}) {
 
 function renderHomeView() {
   const allTracks = S.lib.tracks.filter((track) => matchesSearch(`${track.title} ${track.artist} ${track.album} ${track.folder}`));
-  const heroTracks = allTracks.slice(0, 8);
-  const albums = S.lib.albums.filter((item) => matchesSearch(`${item.name} ${item.artist || ''}`)).slice(0, 6);
-  const artists = S.lib.artists.filter((item) => matchesSearch(item.name)).slice(0, 6);
+  const heroTracks = sortTracksByPlayed(allTracks).slice(0, 8);
+  const albums = sortByPlayedThenName(S.lib.albums.filter((item) => matchesSearch(`${item.name} ${item.artist || ''}`)), 'albums').slice(0, 8);
+  const artists = sortByPlayedThenName(S.lib.artists.filter((item) => matchesSearch(item.name)), 'artists').slice(0, 8);
   $('contextHeader').classList.add('hidden');
   $('contentArea').innerHTML = `
     <section class="home-section">
@@ -516,9 +629,10 @@ function renderHomeView() {
 }
 
 function renderCollectionGrid(type, title) {
-  const items = S.lib[type].filter((item) => matchesSearch(type === 'artists' ? item.name : `${item.name} ${item.artist || ''}`));
-  $('contextHeader').classList.remove('hidden');
-  $('contextHeader').textContent = `${items.length} shown`;
+  const rawItems = S.lib[type].filter((item) => matchesSearch(type === 'artists' ? item.name : `${item.name} ${item.artist || ''}`));
+  const items = [...rawItems];
+  $('contextHeader').classList.add('hidden');
+  $('contextHeader').textContent = '';
   $('contentArea').innerHTML = `
     <section class="home-section">
       <div class="section-head"><div><h2 class="section-title">${title}</h2><div class="section-sub">${items.length} shown</div></div></div>
@@ -527,36 +641,41 @@ function renderCollectionGrid(type, title) {
   `;
 }
 
-function renderArtistHeader(artistName, trackIds) {
-  const artist = S.lib.artists.find((item) => item.name === artistName);
+function renderDetailHeader(context, trackIds) {
+  const type = context.type;
+  const item = (S.lib[type] || []).find((entry) => entry.name === context.value);
+  const artUrl = item?.image_url || item?.art_url || null;
+  const title = context.value;
+  const meta = `${trackIds.length} track(s)`;
   return `
-    <div class="artist-header-card">
-      <div class="artist-header-art">${artMarkup(artist?.image_url || artist?.art_url)}</div>
+    <div class="artist-header-card detail-header-card">
+      <div class="artist-header-art">${artMarkup(artUrl)}</div>
       <div class="artist-header-copy">
-        <div class="artist-header-title">${escapeHtml(artistName)}</div>
-        <div class="artist-header-meta">${trackIds.length} track(s)</div>
+        <div class="artist-header-title">${escapeHtml(title)}</div>
+        <div class="artist-header-meta">${escapeHtml(meta)}</div>
       </div>
-      <div class="artist-actions">${collectionActions('artists', artistName, { menu: true })}</div>
+      <div class="artist-actions">${collectionActions(type, title, { menu: true, menuOnly: true })}</div>
     </div>
   `;
 }
 
 function renderTrackCollection(title, subtitle, trackIds, context) {
   const tracks = buildTrackList(trackIds).filter((track) => matchesSearch(`${track.title} ${track.artist} ${track.album} ${track.folder}`));
-  $('contextHeader').classList.remove('hidden');
+  const detailPage = ['artists', 'albums', 'playlists'].includes(context.type);
+  $('contextHeader').classList.toggle('hidden', detailPage);
   $('contextHeader').textContent = subtitle || `${tracks.length} track(s)`;
-  const showTopActions = context.type !== 'artists';
   $('contentArea').innerHTML = `
     <section class="list-section">
-      <div class="section-head ${showTopActions ? '' : 'artist-page-head'}">
-        <div>
-          <h2 class="section-title">${escapeHtml(title)}</h2>
-          <div class="section-sub">${escapeHtml(subtitle || `${tracks.length} track(s)`)}</div>
+      ${detailPage ? renderDetailHeader(context, trackIds) : `
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">${escapeHtml(title)}</h2>
+            <div class="section-sub">${escapeHtml(subtitle || `${tracks.length} track(s)`)}</div>
+          </div>
+          ${collectionActions(context.type, context.value, { menu: context.type === 'playlists' || context.type === 'folders' })}
         </div>
-        ${showTopActions ? collectionActions(context.type, context.value, { menu: context.type === 'playlists' || context.type === 'folders' || context.type === 'albums' }) : ''}
-      </div>
-      ${context.type === 'artists' ? renderArtistHeader(context.value, trackIds) : ''}
-      <div class="list-section">${tracks.map((track) => renderTrackRow(track, { groupButtons: false })).join('') || '<div class="muted">No tracks found</div>'}</div>
+      `}
+      <div class="list-section track-list">${tracks.map((track) => renderTrackRow(track, { groupButtons: false })).join('') || '<div class="muted">No tracks found</div>'}</div>
     </section>
   `;
 }
@@ -605,9 +724,11 @@ function renderChips() {
 }
 
 function navigate(view, context = null) {
+  const changed = S.view !== view || JSON.stringify(S.context || null) !== JSON.stringify(context || null);
   S.view = view;
   S.context = context;
   renderView();
+  if (changed) requestAnimationFrame(() => { const main = document.querySelector('.main-area'); if (main) main.scrollTop = 0; });
   closeSidebar();
 }
 
@@ -618,13 +739,13 @@ function attachGeneralHandlers() {
       navigate(node.dataset.openType, { type: node.dataset.openType, value: node.dataset.openValue });
     };
   });
-  document.querySelectorAll('[data-track-id]').forEach((node) => {
-    if (node.classList.contains('queue-item')) return;
+  document.querySelectorAll('.row-card[data-track-id], .media-card[data-track-id]').forEach((node) => {
     node.onclick = (event) => {
       if (event.target.closest('.js-track-menu') || event.target.closest('.js-playnext-single') || event.target.closest('.js-addqueue-single')) return;
-      const homeCard = node.classList.contains('media-card') || !!node.closest('.media-card');
-      const listRoot = node.closest('.list-section') || node.closest('.media-row');
-      const sourceNodes = Array.from(listRoot?.querySelectorAll('[data-track-id]') || []).filter((item) => !item.classList.contains('queue-item') && !item.classList.contains('js-home-card-play'));
+      const homeCard = node.classList.contains('media-card');
+      const listRoot = node.closest('.track-list') || node.closest('.media-row') || node.parentElement;
+      const selector = homeCard ? '.media-card[data-track-id]' : '.row-card[data-track-id]';
+      const sourceNodes = Array.from(listRoot?.querySelectorAll(selector) || []);
       const ids = uniqueIds(sourceNodes.map((item) => item.dataset.trackId));
       const index = ids.indexOf(node.dataset.trackId);
       S.userInitiatedPlayback = true;
@@ -945,6 +1066,7 @@ async function loadLibrary() {
 }
 
 async function initialLoad() {
+  loadPlayStats();
   hardStopStartupPlayback();
   await loadLibrary();
   hardStopStartupPlayback();
@@ -957,34 +1079,24 @@ window.addEventListener('pagehide', hardStopStartupPlayback);
 window.addEventListener('beforeunload', hardStopStartupPlayback);
 
 function bindSwipeGestures() {
-  const overlay = $('nowPlayingOverlay');
-  const handle = $('overlayQueueHandle');
-  const sheetHead = $('queueSheetHead');
   const mainPanel = $('nowPlayingPanel');
+  if (!mainPanel) return;
   let startY = null;
-  let mode = null;
-
-  function onStart(event) {
-    startY = event.touches[0].clientY;
-    if (event.currentTarget === handle) mode = 'queue';
-    else if (event.currentTarget === sheetHead) mode = 'sheet';
-    else mode = 'overlay';
-  }
-
-  function onEnd(event) {
+  mainPanel.addEventListener('touchstart', (event) => { startY = event.touches[0].clientY; }, { passive: true });
+  mainPanel.addEventListener('touchend', (event) => {
     if (startY == null) return;
-    const endY = event.changedTouches[0].clientY;
-    const delta = endY - startY;
-    if (mode === 'queue' && delta < -40) toggleQueueSheet(true);
-    if (mode === 'sheet' && delta > 40) toggleQueueSheet(false);
-    if (mode === 'overlay' && delta > 70 && !$('overlayQueueSheet').classList.contains('open')) toggleNowPlaying(false);
+    const delta = event.changedTouches[0].clientY - startY;
+    if (mainPanel.scrollTop <= 4 && delta > 70) toggleNowPlaying(false);
     startY = null;
-    mode = null;
-  }
+  }, { passive: true });
+  mainPanel.addEventListener('scroll', updateNowPlayingScrollProgress, { passive: true });
+}
 
-  [handle, sheetHead, mainPanel].forEach((node) => {
-    node.addEventListener('touchstart', onStart, { passive: true });
-    node.addEventListener('touchend', onEnd, { passive: true });
+
+function updateSeekProgress(value) {
+  const pct = `${Math.max(0, Math.min(100, Number(value || 0) / 10))}%`;
+  [$('seekRange'), $('overlaySeekRange')].filter(Boolean).forEach((range) => {
+    range.style.setProperty('--progress', pct);
   });
 }
 
@@ -1030,8 +1142,9 @@ function wireGlobalEvents() {
   $('miniPlayerInfo').onclick = () => { if (currentTrack()) toggleNowPlaying(true); };
   $('miniPlayerGrabber').onclick = () => { if (currentTrack()) toggleNowPlaying(true); };
   $('closeNowPlayingBtn').onclick = () => toggleNowPlaying(false);
-  $('queueBtn').onclick = () => { if (currentTrack()) toggleNowPlaying(true); };
-  $('overlayQueueHandle').onclick = () => toggleQueueSheet();
+  if ($('queueBtn')) $('queueBtn').onclick = () => { if (currentTrack()) toggleNowPlaying(true); };
+  const overlayQueueHandle = $('overlayQueueHandle');
+  if (overlayQueueHandle) overlayQueueHandle.onclick = () => toggleQueueSheet();
   $('overlayOptionsBtn').onclick = (event) => {
     const track = currentTrack();
     if (track) openQueueItemMenu(event.currentTarget, track.id);
@@ -1049,6 +1162,7 @@ function wireGlobalEvents() {
   const bindSeek = (range, current, total) => {
     range.addEventListener('input', () => {
       S.draggingSeek = true;
+      updateSeekProgress(range.value);
       if (audio.duration) current.textContent = fmt((Number(range.value) / 1000) * audio.duration);
     });
     range.addEventListener('change', () => {
@@ -1064,6 +1178,7 @@ function wireGlobalEvents() {
       const value = Math.floor((audio.currentTime / audio.duration) * 1000);
       $('seekRange').value = value;
       $('overlaySeekRange').value = value;
+      updateSeekProgress(value);
     }
     $('timeCurrent').textContent = fmt(audio.currentTime);
     $('overlayTimeCurrent').textContent = fmt(audio.currentTime);
@@ -1071,7 +1186,7 @@ function wireGlobalEvents() {
     $('overlayTimeTotal').textContent = fmt(audio.duration || 0);
   });
 
-  audio.addEventListener('play', updatePlayer);
+  audio.addEventListener('play', () => { countPlayedTrack(currentTrack()); updatePlayer(); });
   audio.addEventListener('pause', updatePlayer);
   audio.addEventListener('ended', () => {
     if (S.repeat === 'one') { audio.currentTime = 0; audio.play().catch(() => null); return; }

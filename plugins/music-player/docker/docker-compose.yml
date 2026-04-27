@@ -5,7 +5,7 @@ services:
     environment:
       PORT: "8140"
       APP_NAME: "Music Player"
-      APP_VERSION: "8.4.6"
+      APP_VERSION: "8.4.33"
       MUSIC_ROOT: "/mnt/nas/media/music"
       APP_DATA_DIR: "/mnt/nas/homelab/runtime/music-player/data"
     ports:
