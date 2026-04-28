@@ -1,12 +1,12 @@
 services:
   dictionary:
     build: .
-    container_name: offline-dictionary
+    container_name: dictionary
     restart: unless-stopped
     ports:
       - "127.0.0.1:8133:8133"
     environment:
-      APP_NAME: Offline Dictionary
-      APP_VERSION: 1.4.5
+      APP_NAME: "Offline Dictionary"
+      APP_VERSION: "1.4.5"
     volumes:
-      - ./data:/opt/offline-dictionary/data
+      - /mnt/nas/homelab/runtime/dictionary/data:/opt/offline-dictionary/data

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div class="top">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+      <h1 id="appName" style="margin:0">{{ app_name }}</h1>
+      <span id="appVersion" style="background:rgba(255,255,255,.18);padding:6px 10px;border-radius:999px;font-weight:700">v{{ app_version }}</span>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <div class="input-wrap">
+          <input id="q" type="search" placeholder="Search a word" onkeydown="if(event.key==='Enter'){go();}">
+          <button id="clearQ" class="clear-btn" type="button" aria-label="Clear">✕</button>
+        </div>
+        <button id="searchBtn" onclick="go()">Search</button>
+      </div>
+      <div id="out" style="margin-top:16px"></div>
+    </div>
+  </div>
+  <script src="/static/js/script.js"></script>
+</body>
+</html>

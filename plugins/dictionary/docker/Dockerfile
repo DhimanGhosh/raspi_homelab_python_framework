@@ -1,12 +1,16 @@
 FROM python:3.11-slim
+
 WORKDIR /opt/offline-dictionary
-COPY requirements.txt .
 RUN apt-get update \
     && apt-get install -y curl \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir -r requirements.txt
-COPY app /opt/offline-dictionary/app
+    && pip install --no-cache-dir "fastapi>=0.115" "uvicorn[standard]>=0.30" "nltk>=3.9" "jinja2>=3.1"
+
+COPY app.py /opt/offline-dictionary/app.py
+COPY templates /opt/offline-dictionary/templates
 COPY static /opt/offline-dictionary/static
-RUN mkdir -p /opt/offline-dictionary/data /opt/offline-dictionary/data/nltk_data
+
+RUN mkdir -p /opt/offline-dictionary/data
+
 EXPOSE 8133
-CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8133"]
+CMD ["python", "/opt/offline-dictionary/app.py"]

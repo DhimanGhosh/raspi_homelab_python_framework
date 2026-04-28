@@ -2,14 +2,13 @@
   "id": "personal-library",
   "name": "Personal Library",
   "version": "1.3.3",
+  "runtime_type": "docker",
   "network": {
-    "internal_port": 8132
+    "internal_port": 8132,
+    "public_port": 8132
   },
   "entrypoint": {
     "type": "web",
     "path": "/"
-  },
-  "backend": {
-    "type": "docker"
   }
 }

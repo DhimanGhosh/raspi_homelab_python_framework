@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+<div class="top">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+    <h1 style="margin:0">{{ app_name }}</h1>
+    <span style="background:rgba(255,255,255,.18);padding:6px 10px;border-radius:999px;font-weight:700">v{{ app_version }}</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="searchbox"><input id="q" placeholder="Search title / author / genre / notes or field=value like wow=5"><button type="button" class="clearbtn secondary" onclick="clearSearch()">×</button></div>
+        <select id="genre"><option>All</option></select>
+        <select id="status"><option>All</option></select>
+        <button onclick="downloadFile('/api/export.csv')">Export CSV</button>
+        <button onclick="downloadFile('/api/export.json')">Export JSON</button>
+        <button class="secondary" onclick="triggerImport('csv')">Import CSV</button>
+        <button class="secondary" onclick="triggerImport('json')">Import JSON</button>
+        <button class="secondary" onclick="reloadAll()">Refresh</button>
+      </div>
+      <div class="toolbar2">
+        <div class="small" id="activeFilterText">No quick filter applied.</div>
+        <div class="row">
+          <button class="secondary" onclick="downloadFile('/api/import/sample.csv')">Sample CSV</button>
+          <button class="secondary" onclick="downloadFile('/api/import/sample.json')">Sample JSON</button>
+          <button class="secondary" onclick="openSettings()">Settings</button>
+          <button class="secondary" onclick="backupNow()">Backup DB</button>
+          <button class="secondary" onclick="openBackups()">Restore / Remove Backup</button>
+          <button class="secondary" onclick="dedupeBooks()">Remove Duplicates</button>
+        </div>
+      </div>
+      <h3>Add a Book</h3>
+      <div class="grid3">
+        <input id="title" placeholder="Book title *">
+        <input id="author" placeholder="Author">
+        <input id="isbn" placeholder="ISBN">
+      </div>
+      <textarea id="notes" placeholder="Optional notes" style="margin-top:10px"></textarea>
+      <div class="row" style="margin-top:10px"><button onclick="addBook()">Add</button></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="pagination">
+        <div class="row small">
+          <span>Rows per page</span>
+          <select id="pageSize" style="width:100px"><option>5</option><option selected>10</option><option>15</option><option>20</option><option value="99999">All</option></select>
+          <span id="pageInfo"></span>
+        </div>
+        <div class="pagebuttons">
+          <button class="secondary" onclick="prevPage()">Prev</button>
+          <button class="secondary" onclick="nextPage()">Next</button>
+        </div>
+      </div>
+      <div id="desktopTable" class="tablewrap" style="margin-top:10px"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+      <div id="mobileList"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card"><h3 style="margin-top:0">Current Reading</h3><div id="currentReading"></div></div>
+    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Automatic Next Recommendation</h3><div id="recommendation"></div></div>
+    <div class="card" style="margin-top:14px">
+      <h3 style="margin-top:0">Stats</h3>
+      <div class="stats-grid" id="stats"></div>
+      <div style="margin-top:12px"><b>Top genres</b><div id="topGenres" class="small"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="busyOverlay" class="overlay">
+  <div class="overlay-card">
+    <div style="font-size:20px;font-weight:700" id="busyTitle">Working…</div>
+    <div class="small" id="busyText">Please wait.</div>
+    <div class="bar"><div></div></div>
+  </div>
+</div>
+
+<input type="file" id="importCsv" accept=".csv" style="display:none">
+<input type="file" id="importJson" accept=".json" style="display:none">
+
+<dialog id="editDialog">
+  <div class="modal-head"><b>Edit Book</b><button class="secondary" onclick="closeDialog('editDialog')">Close</button></div>
+  <div class="modal-body">
+    <div class="two"><label><span>Title</span><input id="e_title"></label><label><span>Author</span><input id="e_author"></label></div>
+    <div class="three" style="margin-top:10px"><label><span>Genre</span><input id="e_genre"></label><label><span>Subgenres</span><input id="e_subgenres"></label><label><span>Status</span><select id="e_status"></select></label></div>
+    <div class="three" style="margin-top:10px"><label><span>Language</span><input id="e_language"></label><label><span>Published year</span><input id="e_year"></label><label><span>Pages</span><input id="e_pages" type="number" min="0"></label></div>
+    <div class="three" style="margin-top:10px"><label><span>Complexity score (1-5)</span><input id="e_complexity" type="number" min="1" max="5"></label><label><span>WOW score (1-5)</span><input id="e_wow" type="number" min="1" max="5"></label><label><span>Emotion score (1-5)</span><input id="e_emotion" type="number" min="1" max="5"></label></div>
+    <div class="three" style="margin-top:10px"><label><span>Sadness score (1-5)</span><input id="e_sadness" type="number" min="1" max="5"></label><label><span>Realism score (1-5)</span><input id="e_realism" type="number" min="1" max="5"></label><label><span>Publisher</span><input id="e_publisher"></label></div>
+    <div class="three" style="margin-top:10px"><label><span>Current page</span><input id="e_current" type="number" min="0"></label><label><span>Bookmark page</span><input id="e_bookmark" type="number" min="0"></label><label><span>Bookmark note</span><input id="e_bookmark_note"></label></div>
+    <div class="two" style="margin-top:10px"><label><span>Buy link</span><input id="e_buy"></label><label><span>Info link</span><input id="e_info"></label></div>
+    <div class="two" style="margin-top:10px"><label><span>Cover image URL</span><input id="e_cover"></label><label><span>ISBN</span><input id="e_isbn"></label></div>
+    <label style="margin-top:10px;display:block"><span>Description</span><textarea id="e_description"></textarea></label>
+    <label style="margin-top:10px;display:block"><span>Notes</span><textarea id="e_notes"></textarea></label>
+    <div class="card" style="margin-top:12px"><b>Current score breakdown</b><div id="scoreBreakdown" class="small" style="margin-top:8px"></div></div>
+    <div class="row" style="margin-top:12px"><button onclick="saveEdit()">Save</button></div>
+  </div>
+</dialog>
+
+<dialog id="detailDialog">
+  <div class="modal-head"><b>Book Details</b><button class="secondary" onclick="closeDialog('detailDialog')">Close</button></div>
+  <div class="modal-body">
+    <div class="two">
+      <div>
+        <img id="d_cover" class="detail-cover" src="" alt="cover">
+        <div class="row" style="margin-top:10px">
+          <button class="secondary" onclick="openCurrentEdit()">Edit fields</button>
+          <button class="secondary" onclick="reverifyCurrentDetail()">Re-verify</button>
+        </div>
+      </div>
+      <div>
+        <h2 id="d_title" style="margin:0 0 4px 0"></h2>
+        <div class="small" id="d_author"></div>
+        <div class="small" id="d_meta" style="margin-top:6px"></div>
+        <div style="margin-top:10px" id="d_scores"></div>
+        <div class="three" style="margin-top:14px">
+          <div><b>Status</b><div style="margin-top:6px"><select id="d_status" class="status-select" onchange="changeDetailStatus(this.value,this)"></select></div></div>
+          <div><b>Bookmark</b><div class="small" id="d_bookmark"></div></div>
+          <div><b>Score</b><div class="small" id="d_score"></div></div>
+        </div>
+        <div style="margin-top:14px"><b>Genre</b><div class="small" id="d_genre"></div></div>
+        <div style="margin-top:10px"><b>Description</b><div class="small" id="d_description"></div></div>
+        <div style="margin-top:10px"><b>Notes</b><div class="small" id="d_notes"></div></div>
+        <div class="row" style="margin-top:12px">
+          <a id="d_buy" href="#" target="_blank" style="display:none">Buy link</a>
+          <a id="d_info" href="#" target="_blank" style="display:none">Info link</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="settingsDialog">
+  <div class="modal-head"><b>Settings</b><button class="secondary" onclick="closeDialog('settingsDialog')">Close</button></div>
+  <div class="modal-body">
+    <details class="settings-group settings-accordion" data-settings-panel="score" open>
+      <summary>Score Formula</summary>
+      <div class="settings-group-body">
+        <div class="grid3">
+          <div><label>Complexity weight</label><input id="s_english_weight" type="number" step="0.1"></div>
+          <div><label>WOW weight</label><input id="s_wow_weight" type="number" step="0.1"></div>
+          <div><label>Emotion weight</label><input id="s_emotion_weight" type="number" step="0.1"></div>
+          <div><label>Sadness balance weight</label><input id="s_sadness_weight" type="number" step="0.1"></div>
+          <div><label>Realism weight</label><input id="s_realism_weight" type="number" step="0.1"></div>
+          <div><label>Genre bonus weight</label><input id="s_genre_bonus_weight" type="number" step="0.1"></div>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <div><label>Genre bonus raw value</label><input id="s_genre_bonus_value" type="number" step="0.1"></div>
+          <div><label>Genre bonus keywords (comma separated)</label><input id="s_genre_bonus_keywords"></div>
+        </div>
+        <div style="margin-top:10px"><label>Formula label shown in the app</label><textarea id="s_score_formula_label" rows="3"></textarea></div>
+      </div>
+    </details>
+    <details class="settings-group settings-accordion" data-settings-panel="recommendation" style="margin-top:14px">
+      <summary>Automatic Next Recommendation</summary>
+      <div class="settings-group-body">
+        <div class="muted" style="margin-bottom:10px">Choose which statuses are eligible for the next recommendation card.</div>
+        <div class="grid2 rec-check-grid">
+          <label class="rec-check"><span class="rec-check-left"><input type="checkbox" data-rec-status="Not Bought"><span class="rec-check-title">Include Not Bought</span></span><span class="rec-check-value">Not Bought</span></label>
+          <label class="rec-check"><span class="rec-check-left"><input type="checkbox" data-rec-status="Want to Read"><span class="rec-check-title">Include Want to Read</span></span><span class="rec-check-value">Want to Read</span></label>
+          <label class="rec-check"><span class="rec-check-left"><input type="checkbox" data-rec-status="Paused"><span class="rec-check-title">Include Paused</span></span><span class="rec-check-value">Paused</span></label>
+          <label class="rec-check"><span class="rec-check-left"><input type="checkbox" data-rec-status="Read"><span class="rec-check-title">Include Read</span></span><span class="rec-check-value">Read</span></label>
+        </div>
+        <div class="hint-box" style="margin-top:10px">Reading is always treated as the current book, so it is not used as the next recommendation candidate.</div>
+        <div style="margin-top:10px"><label>Recommendation rule label</label><input id="s_recommendation_explain_label"></div>
+      </div>
+    </details>
+    <div class="row" style="margin-top:12px"><button onclick="saveSettings()">Save Settings</button></div>
+  </div>
+</dialog>
+
+<dialog id="backupDialog">
+  <div class="modal-head"><b>Backups</b><button class="secondary" onclick="closeDialog('backupDialog')">Close</button></div>
+  <div class="modal-body"><div id="backupList" class="small"></div></div>
+</dialog>
+
+<script src="/static/js/script.js"></script>
+</body>
+</html>

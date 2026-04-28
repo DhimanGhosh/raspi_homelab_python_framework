@@ -2,14 +2,13 @@
   "id": "dictionary",
   "name": "Dictionary",
   "version": "1.4.5",
+  "runtime_type": "docker",
   "network": {
-    "internal_port": 8133
+    "internal_port": 8133,
+    "public_port": 8133
   },
   "entrypoint": {
     "type": "web",
     "path": "/"
-  },
-  "backend": {
-    "type": "docker"
   }
 }
