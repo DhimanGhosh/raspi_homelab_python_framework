@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir flask requests yt-dlp
 
 COPY app.py /app/app.py
+COPY app /app/app
 COPY templates /app/templates
 COPY static /app/static
 
