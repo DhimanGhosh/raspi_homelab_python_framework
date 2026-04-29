@@ -34,6 +34,10 @@ body {
   gap: 12px;
 }
 
+.form-actions {
+  margin-top: 18px;
+}
+
 .hero-actions {
   display: flex;
   gap: 12px;
@@ -283,6 +287,7 @@ pre {
 .retag-card {
   margin-top: 20px;
   padding-top: 18px;
+  padding-bottom: 20px;
   border-top: 1px solid rgba(255, 255, 255, .08)
 }
 
@@ -334,4 +339,45 @@ textarea {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* ── File upload row ────────────────────────────────────────────────────── */
+.file-upload-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid #2a3853;
+  border-radius: 12px;
+  background: #0f1a2d;
+}
+
+.file-upload-wrap input[type="file"] {
+  flex: 0 0 auto;
+  color: #94a3c4;
+  font-size: 0.85rem;
+}
+
+.file-label {
+  flex: 1;
+  color: #94a3c4;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Divider inside retag card ──────────────────────────────────────────── */
+hr.retag-divider {
+  border: none;
+  border-top: 1px solid #1e2d45;
+  margin: 28px 0;
+}
+
+/* ── Jobs summary bar ───────────────────────────────────────────────────── */
+.jobs-summary {
+  font-size: 0.82rem;
+  color: #94a3c4;
+  flex: 1;
+  padding: 0 8px;
 }

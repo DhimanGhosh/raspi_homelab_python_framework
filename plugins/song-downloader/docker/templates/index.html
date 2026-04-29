@@ -14,8 +14,11 @@
           <div class="eyebrow">Homelab Plugin</div>
           <h1>Song Downloader</h1>
           <p class="subtitle">
-            Download audio tracks using a YouTube link or by searching song name, artist names, and optional album/movie.
-            Files can be auto-moved into your music library using the naming style your music-player expects. If <code>/mnt/nas/homelab/runtime/song-downloader/data/cookies.txt</code> exists, the downloader now uses it automatically for YouTube requests.
+            Download audio tracks via YouTube link or by song/artist/album search.
+            Files are auto-moved into your music library. Place a
+            <code>cookies.txt</code> at
+            <code>/mnt/nas/homelab/runtime/song-downloader/data/cookies.txt</code>
+            to avoid YouTube bot-checks.
           </p>
         </div>
         <div class="hero-actions">
@@ -24,6 +27,7 @@
         </div>
       </div>
 
+      <!-- ── Single download ─────────────────────────────────────────── -->
       <form id="downloadForm" class="download-form section-spacer">
         <div class="section-title-row">
           <h2>Download new song</h2>
@@ -36,7 +40,6 @@
               <button type="button" class="clear-btn" data-target="song_name">×</button>
             </div>
           </label>
-
           <label>
             <span>Artist names</span>
             <div class="input-wrap">
@@ -44,7 +47,6 @@
               <button type="button" class="clear-btn" data-target="artist_names">×</button>
             </div>
           </label>
-
           <label>
             <span>Album / movie (optional)</span>
             <div class="input-wrap">
@@ -52,15 +54,13 @@
               <button type="button" class="clear-btn" data-target="album_name">×</button>
             </div>
           </label>
-
           <label>
             <span>YouTube link (optional)</span>
             <div class="input-wrap">
-              <input type="url" id="youtube_url" placeholder="https://www.youtube.com/watch?v=..." />
+              <input type="url" id="youtube_url" placeholder="https://www.youtube.com/watch?v=…" />
               <button type="button" class="clear-btn" data-target="youtube_url">×</button>
             </div>
           </label>
-
           <label>
             <span>Album art URL (optional)</span>
             <div class="input-wrap">
@@ -68,121 +68,188 @@
               <button type="button" class="clear-btn" data-target="album_art_url">×</button>
             </div>
           </label>
-
           <label class="full-width">
             <span>Rename to (optional)</span>
             <div class="input-wrap">
-              <input type="text" id="rename_to" placeholder="Sher Khul Gaye - Fighter - Benny Dayal, Shilpa Rao, Vishal, Sheykhar" />
+              <input type="text" id="rename_to" placeholder="Sher Khul Gaye - Fighter - Benny Dayal, Shilpa Rao" />
               <button type="button" class="clear-btn" data-target="rename_to">×</button>
             </div>
           </label>
         </div>
-
         <label class="checkbox-row">
           <input type="checkbox" id="auto_move" checked />
           <span>Auto move final file to <code>/mnt/nas/media/music</code></span>
         </label>
-
         <div class="form-actions">
           <button type="submit" class="primary-btn">Start download</button>
-          
         </div>
       </form>
 
+      <!-- ── Multi song download from JSON ──────────────────────────── -->
       <form id="batchDownloadForm" class="download-form retag-card">
         <div class="section-title-row">
           <h2>Multi song download from JSON</h2>
         </div>
         <p class="helper-text">
-          Paste a JSON object in the format <code>{"song name": {"ytb_link": "...", "file_name": "song - album - artists", "album_art": "..."}}</code>.
-          Each valid entry will be queued as a separate download job using the provided filename format.
+          Paste or upload your <code>songs.json</code> from the Windows downloader:
+          <code>{"Song name": {"ytb_link": "…", "file_name": "Song - Album - Artist", "album_art": "…"}}</code>.
+          Songs are downloaded <strong>one at a time</strong> with a delay between each
+          to avoid YouTube bot-detection — the same sequential approach as the Windows tool.
         </p>
-        <label class="full-width">
-          <span>JSON payload</span>
-          <div class="input-wrap no-clear">
-            <textarea id="batch_json" rows="16" placeholder='{"Aami Shei Manushta Aar Nei": {"ytb_link": "https://www.youtube.com/watch?v=N178XIPHHfI", "file_name": "Aami Shei Manushta Aar Nei - Dawshom Awbotaar - Anupam Roy", "album_art": "https://www.jiosaavn.com/album/dawshom-awbotaar/FEi6is4tAQ4_"}}'></textarea>
-          </div>
-        </label>
-        <div class="form-actions">
-          <button type="submit" class="primary-btn">Queue multi song download</button>
-        </div>
-      </form>
 
-      <form id="retagForm" class="download-form retag-card">
-        <div class="section-title-row">
-          <h2>Retag already downloaded songs</h2>
-          <button type="button" id="refreshLibraryBtn" class="ghost-btn small-btn">Refresh song list</button>
-        </div>
-        <p class="helper-text">
-          Choose a song already present inside <code>/mnt/nas/media/music</code> and apply title / artist / album / lyrics / album-art metadata again without re-downloading. Matching tags will be skipped automatically.
-        </p>
         <div class="field-grid">
-          <label>
-            <span>Search song</span>
-            <div class="input-wrap">
-              <input type="text" id="library_song_search" placeholder="Search inside /mnt/nas/media/music" />
-              <button type="button" class="clear-btn" data-target="library_song_search">×</button>
-            </div>
-          </label>
-
-          <label>
-            <span>Existing song</span>
+          <label class="full-width">
+            <span>JSON payload — paste here</span>
             <div class="input-wrap no-clear">
-              <select id="selected_file"></select>
+              <textarea id="batch_json" rows="14"
+                placeholder='{"Aami Shei Manushta Aar Nei": {"ytb_link": "https://www.youtube.com/watch?v=N178XIPHHfI", "file_name": "Aami Shei Manushta Aar Nei - Dawshom Awbotaar - Anupam Roy", "album_art": "https://…"}}'></textarea>
             </div>
           </label>
 
           <label>
-            <span>Song name</span>
-            <div class="input-wrap">
-              <input type="text" id="retag_song_name" placeholder="Tum Hi Ho" />
-              <button type="button" class="clear-btn" data-target="retag_song_name">×</button>
+            <span>— or upload a .json file —</span>
+            <div class="input-wrap no-clear file-upload-wrap">
+              <input type="file" id="batch_json_file" accept=".json" />
+              <span id="batch_file_name" class="file-label">No file chosen</span>
+              <button type="button" id="clearBatchFileBtn" class="clear-btn">×</button>
             </div>
           </label>
 
           <label>
-            <span>Artist names</span>
+            <span>Delay between songs (seconds)</span>
             <div class="input-wrap">
-              <input type="text" id="retag_artist_names" placeholder="Arijit Singh" />
-              <button type="button" class="clear-btn" data-target="retag_artist_names">×</button>
-            </div>
-          </label>
-
-          <label>
-            <span>Album / movie (optional)</span>
-            <div class="input-wrap">
-              <input type="text" id="retag_album_name" placeholder="Aashiqui 2 / Fighter" />
-              <button type="button" class="clear-btn" data-target="retag_album_name">×</button>
-            </div>
-          </label>
-
-          <label>
-            <span>YouTube link (optional)</span>
-            <div class="input-wrap">
-              <input type="url" id="retag_youtube_url" placeholder="https://www.youtube.com/watch?v=..." />
-              <button type="button" class="clear-btn" data-target="retag_youtube_url">×</button>
-            </div>
-          </label>
-
-          <label>
-            <span>Album art URL (optional)</span>
-            <div class="input-wrap">
-              <input type="url" id="retag_album_art_url" placeholder="https://example.com/cover.jpg" />
-              <button type="button" class="clear-btn" data-target="retag_album_art_url">×</button>
+              <input type="number" id="batch_delay" value="10" min="0" max="120" step="1" />
+              <button type="button" class="clear-btn" data-target="batch_delay">×</button>
             </div>
           </label>
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="primary-btn">Apply metadata to selected song</button>
-          <button type="button" id="retagAllBtn" class="ghost-btn">Retag all from filenames</button>
+          <button type="submit" class="primary-btn">Queue sequential download</button>
         </div>
       </form>
+
+      <!-- ── Retag already downloaded songs ─────────────────────────── -->
+      <div class="download-form retag-card">
+
+        <!-- Single-song retag -->
+        <form id="retagForm">
+          <div class="section-title-row">
+            <h2>Retag already downloaded songs</h2>
+            <button type="button" id="refreshLibraryBtn" class="ghost-btn small-btn">Refresh song list</button>
+          </div>
+          <p class="helper-text">
+            Choose a song from <code>/mnt/nas/media/music</code> and re-apply
+            title / artist / album / lyrics / album-art metadata without re-downloading.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Search song</span>
+              <div class="input-wrap">
+                <input type="text" id="library_song_search" placeholder="Search inside /mnt/nas/media/music" />
+                <button type="button" class="clear-btn" data-target="library_song_search">×</button>
+              </div>
+            </label>
+            <label>
+              <span>Existing song</span>
+              <div class="input-wrap no-clear">
+                <select id="selected_file"></select>
+              </div>
+            </label>
+            <label>
+              <span>Song name</span>
+              <div class="input-wrap">
+                <input type="text" id="retag_song_name" placeholder="Tum Hi Ho" />
+                <button type="button" class="clear-btn" data-target="retag_song_name">×</button>
+              </div>
+            </label>
+            <label>
+              <span>Artist names</span>
+              <div class="input-wrap">
+                <input type="text" id="retag_artist_names" placeholder="Arijit Singh" />
+                <button type="button" class="clear-btn" data-target="retag_artist_names">×</button>
+              </div>
+            </label>
+            <label>
+              <span>Album / movie (optional)</span>
+              <div class="input-wrap">
+                <input type="text" id="retag_album_name" placeholder="Aashiqui 2" />
+                <button type="button" class="clear-btn" data-target="retag_album_name">×</button>
+              </div>
+            </label>
+            <label>
+              <span>YouTube link (optional)</span>
+              <div class="input-wrap">
+                <input type="url" id="retag_youtube_url" placeholder="https://www.youtube.com/watch?v=…" />
+                <button type="button" class="clear-btn" data-target="retag_youtube_url">×</button>
+              </div>
+            </label>
+            <label>
+              <span>Album art URL (optional)</span>
+              <div class="input-wrap">
+                <input type="url" id="retag_album_art_url" placeholder="https://example.com/cover.jpg" />
+                <button type="button" class="clear-btn" data-target="retag_album_art_url">×</button>
+              </div>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary-btn">Apply metadata to selected song</button>
+            <button type="button" id="retagAllBtn" class="ghost-btn">Retag all from filenames</button>
+          </div>
+        </form>
+
+        <!-- Retag from JSON -->
+        <hr class="retag-divider" />
+        <form id="retagFromJsonForm">
+          <div class="section-title-row">
+            <h3>Retag from JSON</h3>
+          </div>
+          <p class="helper-text">
+            Paste or upload your <code>songs.json</code>. Each entry's
+            <code>file_name</code> is matched against existing files in
+            <code>/mnt/nas/media/music</code> and retagged using its
+            <code>ytb_link</code> for precise metadata — the same
+            approach as the Windows downloader. Files not found in the library
+            are skipped with a log entry. Songs are processed
+            <strong>one at a time</strong> with a configurable delay.
+          </p>
+          <div class="field-grid">
+            <label class="full-width">
+              <span>JSON payload — paste here</span>
+              <div class="input-wrap no-clear">
+                <textarea id="retag_json" rows="10"
+                  placeholder='{"Tum Hi Ho": {"ytb_link": "https://www.youtube.com/watch?v=…", "file_name": "Tum Hi Ho - Aashiqui 2 - Arijit Singh"}}'></textarea>
+              </div>
+            </label>
+            <label>
+              <span>— or upload a .json file —</span>
+              <div class="input-wrap no-clear file-upload-wrap">
+                <input type="file" id="retag_json_file" accept=".json" />
+                <span id="retag_file_name" class="file-label">No file chosen</span>
+                <button type="button" id="clearRetagFileBtn" class="clear-btn">×</button>
+              </div>
+            </label>
+            <label>
+              <span>Delay between songs (seconds)</span>
+              <div class="input-wrap">
+                <input type="number" id="retag_json_delay" value="10" min="0" max="120" step="1" />
+                <button type="button" class="clear-btn" data-target="retag_json_delay">×</button>
+              </div>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary-btn">Retag matched songs from JSON</button>
+          </div>
+        </form>
+
+      </div><!-- /.retag-card -->
     </section>
 
+    <!-- ── Jobs ──────────────────────────────────────────────────────── -->
     <section class="jobs-card">
       <div class="jobs-header">
         <h2>Jobs</h2>
+        <div id="jobsSummary" class="jobs-summary"></div>
         <div class="jobs-actions">
           <button type="button" id="abortAllJobsBtn" class="ghost-btn danger">Abort all</button>
           <button type="button" id="clearJobsBtn" class="ghost-btn danger">Clear jobs</button>

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -86,7 +88,7 @@ def run_download_job(job_id: str) -> None:
         target_name = rename_to or build_target_filename(song_name, artist_names, album_name)
         if not target_name.lower().endswith(".mp3"):
             target_name += ".mp3"
-        dest_dir  = MUSIC_ROOT if auto_move else DOWNLOADS_DIR
+        dest_dir   = MUSIC_ROOT if auto_move else DOWNLOADS_DIR
         final_path = safe_destination(dest_dir / target_name)
 
         shutil.move(str(downloaded), str(final_path))
@@ -111,6 +113,30 @@ def run_download_job(job_id: str) -> None:
     except Exception as exc:
         update_job(job_id, status="failed", error=str(exc), progress=100)
         append_log(job_id, f"ERROR: {exc}")
+
+
+# ── Sequential batch runner ────────────────────────────────────────────────────
+
+def run_sequential_batch(job_ids: list[str], delay_seconds: int) -> None:
+    """Run a list of download jobs one by one with a cooldown between each.
+
+    Each job shows a "waiting N s" message before it starts so the user can see
+    the anti-bot delay in real time on the job card.
+    """
+    for i, job_id in enumerate(job_ids):
+        if is_abort_requested(job_id):
+            update_job(job_id, status="aborted", progress=100)
+            continue
+        if i > 0 and delay_seconds > 0:
+            # Mark as running so the card shows activity while waiting
+            update_job(job_id, status="running", progress=1)
+            append_log(job_id, f"Anti-bot cooldown: waiting {delay_seconds}s before starting…")
+            # Respect per-second abort checks during the wait
+            for _ in range(delay_seconds):
+                if is_abort_requested(job_id):
+                    break
+                time.sleep(1)
+        run_download_job(job_id)
 
 
 # ── Retag job ──────────────────────────────────────────────────────────────────
@@ -150,6 +176,92 @@ def run_retag_job(job_id: str) -> None:
         append_log(job_id, f"ERROR: {exc}")
 
 
+# ── Retag-from-JSON job ────────────────────────────────────────────────────────
+
+def run_retag_from_json_job(job_id: str) -> None:
+    """Match existing library files against a songs JSON map and retag them
+    sequentially using the YouTube links provided in the JSON (avoids bot-check
+    failures that occur when every search query hits YouTube at once).
+    """
+    if is_abort_requested(job_id):
+        update_job(job_id, status="aborted", progress=100)
+        return
+    job = update_job(job_id, status="running", progress=1)
+    if not job:
+        return
+
+    payload       = job["payload"]
+    songs_map     = payload.get("songs_map", {})
+    delay_seconds = int(payload.get("delay_seconds", 8))
+
+    # Build a lowercase-stem → Path index of every mp3 in the library
+    library_index: dict[str, Path] = {}
+    for path in MUSIC_ROOT.rglob("*.mp3"):
+        library_index[path.stem.strip().lower()] = path
+
+    matched:   list[tuple[Path, str, dict]] = []
+    not_found: list[str]                    = []
+
+    for song_key, item in songs_map.items():
+        file_name = (item.get("file_name") or song_key).strip()
+        # Strip .mp3 extension if present to get the stem
+        stem = Path(file_name).stem if file_name.lower().endswith(".mp3") else file_name
+        if stem.strip().lower() in library_index:
+            matched.append((library_index[stem.strip().lower()], song_key, item))
+        else:
+            not_found.append(file_name)
+
+    append_log(job_id, f"Library scan complete — matched: {len(matched)}, not found: {len(not_found)}")
+    for nf in not_found:
+        append_log(job_id, f"  NOT FOUND: {nf}")
+
+    total = len(matched)
+    if total == 0:
+        update_job(job_id, status="completed", progress=100)
+        append_log(job_id, "Nothing to retag.")
+        return
+
+    for i, (file_path, song_key, item) in enumerate(matched):
+        if is_abort_requested(job_id):
+            update_job(job_id, status="aborted", progress=100)
+            append_log(job_id, "Retag from JSON aborted.")
+            return
+
+        if i > 0 and delay_seconds > 0:
+            append_log(job_id, f"Anti-bot cooldown: waiting {delay_seconds}s…")
+            for _ in range(delay_seconds):
+                if is_abort_requested(job_id):
+                    break
+                time.sleep(1)
+
+        file_name     = (item.get("file_name") or song_key).strip()
+        title, album, artist = parse_filename_metadata(file_name)
+        ytb_link      = (item.get("ytb_link")   or "").strip()
+        album_art_url = (item.get("album_art")  or "").strip()
+
+        retag_payload = {
+            "song_name":    title  or song_key,
+            "artist_names": artist,
+            "album_name":   album,
+            "youtube_url":  ytb_link,
+            "album_art_url": album_art_url,
+        }
+
+        try:
+            append_log(job_id, f"({i + 1}/{total}) Retagging: {file_path.name}")
+            log_yt_dlp_runtime(job_id, retag_payload)
+            source = resolve_source(retag_payload)
+            enrich_file_metadata(file_path, retag_payload, source, lambda line: append_log(job_id, line))
+        except Exception as exc:
+            append_log(job_id, f"ERROR retagging {file_path.name}: {exc}")
+
+        set_progress(job_id, min(99, int(((i + 1) / total) * 100)))
+
+    final_status = "aborted" if is_abort_requested(job_id) else "completed"
+    update_job(job_id, status=final_status, progress=100)
+    append_log(job_id, f"Retag from JSON done — matched: {len(matched)}, not found: {len(not_found)}")
+
+
 # ── Retag-all job ──────────────────────────────────────────────────────────────
 
 def run_retag_all_job(job_id: str) -> None:
@@ -174,7 +286,6 @@ def run_retag_all_job(job_id: str) -> None:
         update_job(job_id, status="completed", progress=100)
         return
 
-    import os
     workers = min(4, max(1, (os.cpu_count() or 2)))
     append_log(job_id, f"Retag-all started with {total} songs using {workers} workers")
     completed      = 0
