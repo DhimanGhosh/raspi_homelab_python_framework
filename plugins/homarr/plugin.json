@@ -1,7 +1,7 @@
 {
   "id": "homarr",
   "name": "Homarr",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "runtime_type": "docker",
   "network": {
     "internal_port": 7575,
