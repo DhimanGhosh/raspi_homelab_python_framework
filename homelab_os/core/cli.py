@@ -145,6 +145,11 @@ def build_all_plugins(env_file: str = '.env') -> None:
 
 @app.command('install-plugin')
 def install_plugin(plugin_archive: Path, env_file: str = '.env') -> None:
+    """Install a plugin archive AND start it immediately.
+
+    Identical behaviour to clicking Install in the Control Center GUI —
+    no separate start-plugin call required.
+    """
     settings, job_store, logger = _job_services(env_file)
     installer = PluginInstaller(
         settings=settings,
@@ -152,23 +157,38 @@ def install_plugin(plugin_archive: Path, env_file: str = '.env') -> None:
         registry_file=settings.manifests_dir / 'installed_plugins.json',
         state_file=settings.manifests_dir / 'plugin_state.json',
     )
-    job = job_store.create_job('install_plugin', str(plugin_archive), {'archive': str(plugin_archive)})
+    runtime = PluginRuntime(
+        settings.runtime_installed_plugins_dir,
+        settings.manifests_dir / 'plugin_state.json',
+        settings=settings,
+    )
+    job = job_store.create_job('install_plugin', str(plugin_archive), {'archive': str(plugin_archive), 'auto_start': True})
     logger.append_job_log(job['job_id'], f'Starting install for {plugin_archive}')
     try:
         job_store.update_job(job['job_id'], status='running', progress=10)
         result = installer.install_plugin(plugin_archive)
+        plugin_id = result['id']
         logger.append_job_log(job['job_id'], f"Installed plugin: {result['name']} ({result['version']})")
         logger.append_job_log(job['job_id'], f"Installed dir: {result['installed_dir']}")
+
+        # Auto-start — same as CC GUI install flow
+        job_store.update_job(job['job_id'], status='running', progress=70)
+        logger.append_job_log(job['job_id'], f'Auto-starting {plugin_id}')
+        start_result = runtime.start_plugin(plugin_id)
+        logger.append_job_log(job['job_id'], f'Started: {start_result}')
+        result['start_result'] = start_result
+
         if result.get('public_url'):
             logger.append_job_log(job['job_id'], f"Open URL: {result['public_url']}")
+
         job_store.update_job(job['job_id'], status='completed', progress=100, result=result)
-        typer.echo(f"Installed plugin: {result['name']} ({result['version']})")
-        typer.echo(f"Installed dir: {result['installed_dir']}")
+        typer.echo(f"Installed: {result['name']} ({result['version']})")
+        typer.echo(f"Started:   {plugin_id}")
         if result.get('public_url'):
-            typer.echo(f"Open URL: {result['public_url']}")
-        typer.echo(f"Job ID: {job['job_id']}")
+            typer.echo(f"Open URL:  {result['public_url']}")
+        typer.echo(f"Job ID:    {job['job_id']}")
     except Exception as exc:
-        logger.append_job_log(job['job_id'], f'Install failed: {exc}')
+        logger.append_job_log(job['job_id'], f'Install/start failed: {exc}')
         job_store.update_job(job['job_id'], status='failed', progress=100, error=str(exc))
         raise
 
