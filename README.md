@@ -231,6 +231,7 @@ homelabctl reconcile-routes --env-file .env
 | Media Downloader | `link-downloader` | 8460 | `https://<fqdn>:8460/` |
 | Song Downloader | `song-downloader` | 8445 | `https://<fqdn>:8445/` |
 | Files | `files` | 8449 | `https://<fqdn>:8449/` |
+| Expense Tracker | `expense-tracker` | 8461 | `https://<fqdn>:8461/` |
 
 Replace `<fqdn>` with your `TAILSCALE_FQDN` value (e.g. `pi-nas.taild4713b.ts.net`).
 
