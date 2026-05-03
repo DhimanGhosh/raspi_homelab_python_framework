@@ -318,6 +318,22 @@ def index():
     return {"status": "ok"}
 ```
 
+### Plugin Data Persistence
+
+Each plugin's user data must be stored on the NAS, outside the container, so it survives Docker rebuilds and plugin updates. Store all runtime state under `/mnt/nas/homelab/runtime/<plugin-id>/data/` and bind-mount it into the container via `docker-compose.yml`:
+
+```yaml
+volumes:
+  - /mnt/nas/homelab/runtime/my-plugin/data:/mnt/nas/homelab/runtime/my-plugin/data
+```
+
+The installer (`homelab_os/core/plugin_manager/installer.py`) enforces a strict separation between the plugin *code* directory and the plugin *data* directory:
+
+- **On install / update** — only the code directory is replaced. The NAS data directory is never touched, so all user data (settings, playlists, uploads, etc.) is automatically preserved across updates.
+- **On explicit uninstall** (`homelabctl uninstall-plugin`) — both the code directory and the data directory are removed.
+
+> **Rule:** Never store persistent user data inside the container or in Docker named volumes. Always use NAS bind-mounts. Never use browser `localStorage` for data that must be shared across devices or survive a container rebuild.
+
 ### Streaming plugins
 
 If your plugin streams binary data (audio, large file downloads), add the plugin ID to `_STREAMING_PLUGINS` in `homelab_os/core/services/reverse_proxy.py`. This adds `flush_interval -1` to the Caddy snippet so bytes reach the browser immediately instead of being buffered.
@@ -430,6 +446,8 @@ homelabctl build-plugin <plugin-id> --env-file .env
 homelabctl uninstall-plugin <plugin-id> --env-file .env
 homelabctl install-plugin build/<plugin-id>.v<new-version>.tgz --env-file .env
 ```
+
+> **Note:** Plugin user data stored under `/mnt/nas/homelab/runtime/<plugin-id>/data/` is automatically preserved during an update. The installer only replaces the plugin code directory; the data directory on the NAS is never touched. Use `homelabctl uninstall-plugin` only when you intentionally want to remove the plugin and all its data.
 
 ### Update everything
 
