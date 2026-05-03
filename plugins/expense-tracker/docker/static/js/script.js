@@ -51,7 +51,7 @@ async function loadCategories() {
 }
 
 /* ── Navigation ─────────────────────────────────────────────────────────── */
-const VIEWS = ['dashboard', 'transactions', 'budgets', 'analytics', 'recurring'];
+const VIEWS = ['dashboard', 'transactions', 'budgets', 'analytics', 'ask', 'recurring'];
 
 function navigate(view) {
   VIEWS.forEach(v => {
@@ -65,6 +65,7 @@ function navigate(view) {
   if (view === 'transactions') loadTransactions();
   if (view === 'budgets')      loadBudget();
   if (view === 'analytics')    loadAnalytics();
+  if (view === 'ask')          focusAsk();
   if (view === 'recurring')    loadRecurring();
 }
 
@@ -374,6 +375,81 @@ async function loadAnalytics() {
   renderList('analyticsInsights', data.insights?.descriptions);
   renderList('analyticsInvestments', data.insights?.investment_suggestions);
 }
+
+/* ── Ask ────────────────────────────────────────────────────────────────── */
+function focusAsk() {
+  const prompt = $('askPrompt');
+  if (prompt && !prompt.value) prompt.focus();
+}
+
+function renderAskRows(rows) {
+  if (!rows || !rows.length) return '';
+  const keys = Object.keys(rows[0]);
+  return `
+    <div class="table-wrap ask-table">
+      <table>
+        <thead><tr>${keys.map(k => `<th>${esc(k.replaceAll('_', ' '))}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${rows.map(row => `<tr>${keys.map(k => {
+            const value = row[k];
+            const isAmount = ['amount', 'spent', 'total', 'this_month', 'last_month', 'change', 'suggested_reduction', 'goal', 'monthly_savings'].includes(k);
+            return `<td>${isAmount && typeof value === 'number' ? fmt(value) : esc(value ?? '—')}</td>`;
+          }).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderAskEvidence(toolResults) {
+  if (!toolResults || !toolResults.length) return '';
+  return toolResults.map(item => {
+    const result = item.result;
+    let body = '';
+    if (Array.isArray(result)) {
+      body = renderAskRows(result);
+    } else if (result && Array.isArray(result.rows)) {
+      body = renderAskRows(result.rows);
+    } else if (result && Array.isArray(result.category_breakdown)) {
+      body = renderAskRows(result.category_breakdown);
+    } else if (result && Array.isArray(result.recent_expenses)) {
+      body = renderAskRows(result.recent_expenses);
+    } else if (result && typeof result === 'object') {
+      body = `<pre class="ask-json">${esc(JSON.stringify(result, null, 2))}</pre>`;
+    }
+    return `<div class="ask-evidence"><strong>${esc(item.tool || 'tool')}</strong>${body}</div>`;
+  }).join('');
+}
+
+async function askExpenses(promptText) {
+  const prompt = (promptText || $('askPrompt').value || '').trim();
+  if (!prompt) return;
+  $('askPrompt').value = prompt;
+  $('askResultBox').style.display = 'block';
+  $('askSource').textContent = '';
+  $('askAnswer').textContent = 'Thinking locally...';
+  $('askRows').innerHTML = '';
+  $('askSuggestions').innerHTML = '';
+  let result;
+  try { result = await api('POST', '/api/ask', { prompt }); }
+  catch { toast('Ask failed', 'err'); $('askAnswer').textContent = 'I could not answer that right now.'; return; }
+  $('askSource').textContent = `${result.source || 'local_agent'} · ${result.model || 'local model'}`;
+  $('askAnswer').textContent = result.answer || '';
+  $('askRows').innerHTML = renderAskEvidence(result.tool_results) || renderAskRows(result.rows);
+  $('askSuggestions').innerHTML = (result.suggestions || []).map(s => `
+    <button type="button" class="btn btn-sm btn-secondary" data-prompt="${esc(s)}">${esc(s)}</button>
+  `).join('');
+}
+
+$('askForm').addEventListener('submit', e => {
+  e.preventDefault();
+  askExpenses();
+});
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-prompt]');
+  if (!btn) return;
+  askExpenses(btn.dataset.prompt);
+});
 
 /* ── Recurring ───────────────────────────────────────────────────────────── */
 let _recurringRows = [];

@@ -1,0 +1,14 @@
+[Unit]
+Description=Expense Tracker llama.cpp server using NAS model
+After=network-online.target mnt-nas.mount
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dhimanghosh
+ExecStart=/mnt/nas/ai/bin/llama-server -m /mnt/nas/ai/models/expense-agent/expense-agent-q4_k_m.gguf -c 4096 --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

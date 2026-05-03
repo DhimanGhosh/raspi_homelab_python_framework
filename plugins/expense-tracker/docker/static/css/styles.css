@@ -188,6 +188,28 @@ td.amt-pos { color: var(--success); font-weight: 600; }
 .status-dl dd { font-weight: 600; text-align: right; }
 .alert-box { background: rgba(245,158,11,.12); border: 1px solid var(--warning); border-radius: var(--radius); padding: .75rem 1rem; color: var(--warning); margin-top: 1rem; }
 
+/* ── Ask / prompt tracking ──────────────────────────────────────────────── */
+.ask-form { display: grid; grid-template-columns: 1fr auto; gap: .75rem; align-items: end; }
+.ask-form textarea { resize: vertical; min-height: 92px; }
+.ask-answer { font-size: 1rem; margin-bottom: 1rem; }
+.prompt-examples { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.ask-table { margin-top: 1rem; }
+.ask-follow-title { margin-top: 1rem; }
+.ask-evidence {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem;
+  margin-top: .75rem;
+  background: rgba(15,23,42,.35);
+}
+.ask-json {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  color: var(--muted);
+  margin-top: .6rem;
+  font-size: .82rem;
+}
+
 /* ── Modal ───────────────────────────────────────────────────────────────── */
 .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 500; align-items: center; justify-content: center; }
 .modal.open { display: flex; }
@@ -225,6 +247,7 @@ td.amt-pos { color: var(--success); font-weight: 600; }
   .cards   { grid-template-columns: 1fr 1fr; }
   .quick-form { grid-template-columns: 1fr; }
   .balance-form { grid-template-columns: 1fr; }
+  .ask-form { grid-template-columns: 1fr; }
   .filter-input { max-width: none; width: 100%; }
   th:nth-child(4), td:nth-child(4),
   th:nth-child(5), td:nth-child(5) { display: none; }

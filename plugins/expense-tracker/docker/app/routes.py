@@ -12,6 +12,7 @@ from app.services.expense_service import ExpenseService
 from app.services.budget_service import BudgetService
 from app.services.recurring_service import RecurringService
 from app.services.balance_service import BalanceService
+from app.services.agent_service import AgentService
 
 router = APIRouter()
 
@@ -178,6 +179,13 @@ def analytics(months: int = 6, db: Session = Depends(get_db)):
         "breakdown": breakdown,
         "insights":  exp_svc.smart_insights(month, status, breakdown, trends),
     }
+
+
+# ── Ask / prompt tracking ─────────────────────────────────────────────────────
+
+@router.post("/api/ask")
+def ask_expenses(payload: dict, db: Session = Depends(get_db)):
+    return AgentService(db).answer(payload.get("prompt", ""))
 
 
 # ── Recurring ─────────────────────────────────────────────────────────────────

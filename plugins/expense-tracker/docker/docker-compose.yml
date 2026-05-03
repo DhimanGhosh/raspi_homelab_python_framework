@@ -5,15 +5,21 @@ services:
     environment:
       PORT: "8161"
       APP_NAME: "Expense Tracker"
-      APP_VERSION: "1.0.2"
+      APP_VERSION: "2.1.0"
       APP_DATA_DIR: "/data"
+      LLM_BACKEND: "llama_cpp"
+      LLM_BASE_URL: "http://host.docker.internal:8080"
+      LLM_MODEL: "expense-agent"
+      LLM_TIMEOUT: "120"
       LOG_LEVEL: "INFO"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:8161:8161"
     volumes:
       - /mnt/nas/homelab/runtime/expense-tracker/data:/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8161/health', timeout=5).read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8161/api/health', timeout=5).read()"]
       interval: 30s
       timeout: 10s
       retries: 5

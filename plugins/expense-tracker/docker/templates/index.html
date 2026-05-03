@@ -20,6 +20,7 @@
     <a href="#transactions" class="nav-link"         data-view="transactions">Transactions</a>
     <a href="#budgets"      class="nav-link"         data-view="budgets">Budgets</a>
     <a href="#analytics"    class="nav-link"         data-view="analytics">Analytics</a>
+    <a href="#ask"          class="nav-link"         data-view="ask">Ask</a>
     <a href="#recurring"    class="nav-link"         data-view="recurring">Recurring</a>
   </nav>
 </header>
@@ -184,6 +185,33 @@
         <div class="section-title">Investment Ideas</div>
         <ul id="analyticsInvestments" class="insight-list"></ul>
       </div>
+    </div>
+  </section>
+
+  <!-- ASK -->
+  <section id="view-ask" class="view">
+    <h2>Ask Expenses</h2>
+    <div class="section-box">
+      <div class="section-title">Local Agentic AI</div>
+      <form id="askForm" class="ask-form">
+        <textarea name="prompt" id="askPrompt" rows="4" placeholder="Ask anything about your expenses, goals, investments, categories, or trends..." required></textarea>
+        <button type="submit" class="btn btn-primary">Ask</button>
+      </form>
+      <div class="prompt-examples">
+        <button type="button" class="btn btn-sm btn-secondary" data-prompt="Which investment plan should I go for based on my savings?">Investment plan</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-prompt="Which expense category changed most last month compared to this month?">Category change</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-prompt="What expenses should I reduce to achieve my goal?">Reduce for goal</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-prompt="How many years months and days are left to achieve my goal?">Goal time</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-prompt="Show me top expenses I made in the last 3 months.">Top expenses</button>
+      </div>
+    </div>
+    <div class="section-box" id="askResultBox" style="display:none">
+      <div class="section-title">Answer</div>
+      <p id="askSource" class="hint"></p>
+      <p id="askAnswer" class="ask-answer"></p>
+      <div id="askRows"></div>
+      <div class="section-title ask-follow-title">Try Next</div>
+      <div id="askSuggestions" class="prompt-examples"></div>
     </div>
   </section>
 
